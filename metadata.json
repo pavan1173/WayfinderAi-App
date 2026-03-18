@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Wayfinder Ai 11",
+  "description": "Your AI-powered travel companion that turns social media inspiration into perfect itineraries.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
