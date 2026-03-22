@@ -1,35 +1,108 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../../store/AppContext';
-import { ChevronRight, Star, Users, MapPin, CheckCircle2, Search, Share2, Heart, Instagram, FileText, Camera } from 'lucide-react';
+import { ChevronRight, Star, Users, MapPin, CheckCircle2, Search, Share2, Heart, Instagram, FileText, Camera, Mail, Lock } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { DetectingAnimation } from '../import/DetectingAnimation';
 import { Logo } from '../Logo';
+import { auth, googleProvider, db } from '../../firebase';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
+import { useToast } from '../../store/ToastContext';
 export const Onboarding = () => {
   const [step, setStep] = useState(0);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLogin, setIsLogin] = useState(true);
   const { setOnboarded } = useApp();
+  const { showToast } = useToast();
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const userCredential = await signInWithPopup(auth, googleProvider);
+      const user = userCredential.user;
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email,
+        createdAt: new Date().toISOString(),
+        role: 'user'
+      }, { merge: true });
+      handleNext();
+    } catch (error: any) {
+      console.error("Error signing in with Google", error);
+      if (error.code === 'auth/internal-error') {
+        showToast("Internal authentication error. Please ensure Google Sign-in is enabled in your Firebase Console.");
+      } else {
+        showToast(`Error signing in with Google: ${error.message}`);
+      }
+    }
+  };
+
+  const handleEmailAuth = async () => {
+    try {
+      let userCredential;
+      if (isLogin) {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        await setDoc(doc(db, 'users', user.uid), {
+          email: user.email,
+          createdAt: new Date().toISOString(),
+          role: 'user'
+        }, { merge: true });
+      }
+      handleNext();
+    } catch (error: any) {
+      console.error("Error with email auth", error);
+      if (error.code === 'auth/email-already-in-use') {
+        showToast("Email already in use. Please sign in instead.");
+        setIsLogin(true);
+      } else if (error.code === 'auth/operation-not-allowed') {
+        showToast("Email/password authentication is not enabled. Please enable it in the Firebase console.");
+      } else if (error.code === 'auth/invalid-email') {
+        showToast("Invalid email address. Please check your email.");
+      } else {
+        showToast("Error with email auth. Please try again.");
+      }
+    }
+  };
 
   const steps = [
     {
       title: <Logo className="scale-75 origin-bottom" />,
       subtitle: "Your favourite travel companion",
       content: (
-        <div className="flex flex-col items-center gap-8 mt-12">
-          <div className="relative w-64 h-80">
+        <div className="flex flex-col items-center gap-4 mt-8 w-full px-6">
+          <button
+            onClick={handleGoogleSignIn}
+            className="w-full bg-white text-slate-900 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-slate-200 flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors border border-slate-200"
+          >
+            Sign in with Google
+          </button>
+          <div className="text-slate-400 text-sm">or</div>
+          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all" />
+          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all" />
+          <button onClick={handleEmailAuth} className="w-full bg-brand text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-brand/20 hover:bg-brand-dark transition-all active:scale-95">
+            {isLogin ? 'Sign In' : 'Create Account'}
+          </button>
+          <button onClick={() => setIsLogin(!isLogin)} className="text-sm text-brand font-medium">
+            {isLogin ? 'Need an account? Create one' : 'Already have an account? Sign in'}
+          </button>
+          <div className="relative w-64 h-64 mt-4">
             <motion.div 
               initial={{ rotate: -10, y: 20 }}
               animate={{ rotate: -5, y: 0 }}
               className="absolute inset-0 bg-white rounded-2xl shadow-xl border-4 border-white overflow-hidden"
             >
-              <img src="https://picsum.photos/seed/travel1/400/600" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src="https://loremflickr.com/400/600/travel,beach" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </motion.div>
             <motion.div 
               initial={{ rotate: 10, y: 40 }}
               animate={{ rotate: 5, y: 20 }}
               className="absolute inset-0 bg-white rounded-2xl shadow-xl border-4 border-white overflow-hidden"
             >
-              <img src="https://picsum.photos/seed/travel2/400/600" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src="https://loremflickr.com/400/600/travel,city" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </motion.div>
             <motion.div 
               animate={{ scale: [1, 1.1, 1] }}
@@ -178,13 +251,15 @@ export const Onboarding = () => {
       </div>
 
         <div className="absolute bottom-0 left-0 right-0 p-8 bg-white/50 backdrop-blur-xl">
-          <button
-            onClick={handleNext}
-            className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-slate-200 flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors"
-          >
-            {step === 0 ? "Get Started" : "Continue"}
-            <ChevronRight size={20} />
-          </button>
+          {step !== 0 && (
+            <button
+              onClick={handleNext}
+              className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-slate-200 flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors"
+            >
+              Continue
+              <ChevronRight size={20} />
+            </button>
+          )}
         </div>
       </div>
     </div>

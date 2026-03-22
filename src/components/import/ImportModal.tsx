@@ -31,10 +31,10 @@ export const ImportModal = ({ isOpen, onClose, onPlanManual }: { isOpen: boolean
     // Simulate fetching social posts
     setTimeout(() => {
       setSocialPosts([
-        { id: 1, platform: 'TikTok', author: '@travelwithme', image: `https://picsum.photos/seed/${query}1/400/600`, caption: `Top 5 hidden gems in ${query}! 🌟 #travel #hiddenGems` },
-        { id: 2, platform: 'Instagram', author: '@wanderlust', image: `https://picsum.photos/seed/${query}2/400/600`, caption: `My 3-day itinerary for ${query} ✈️ You can't miss these spots!` },
-        { id: 3, platform: 'TikTok', author: '@foodie_travels', image: `https://picsum.photos/seed/${query}3/400/600`, caption: `Best street food spots in ${query} 🍜 #foodie` },
-        { id: 4, platform: 'Instagram', author: '@scenic_views', image: `https://picsum.photos/seed/${query}4/400/600`, caption: `Breathtaking views in ${query} 📸 Save this for your next trip!` },
+        { id: 1, platform: 'TikTok', author: '@travelwithme', image: `https://loremflickr.com/400/400/${encodeURIComponent(query.split(' ').join(','))},travel`, caption: `Top 5 hidden gems in ${query}! 🌟 #travel #hiddenGems` },
+        { id: 2, platform: 'Instagram', author: '@wanderlust', image: `https://loremflickr.com/400/400/${encodeURIComponent(query.split(' ').join(','))},city`, caption: `My 3-day itinerary for ${query} ✈️ You can't miss these spots!` },
+        { id: 3, platform: 'TikTok', author: '@foodie_travels', image: `https://loremflickr.com/400/400/${encodeURIComponent(query.split(' ').join(','))},food`, caption: `Best street food spots in ${query} 🍜 #foodie` },
+        { id: 4, platform: 'Instagram', author: '@scenic_views', image: `https://loremflickr.com/400/400/${encodeURIComponent(query.split(' ').join(','))},view`, caption: `Breathtaking views in ${query} 📸 Save this for your next trip!` },
       ]);
       setIsSearchingSocial(false);
     }, 1500);
@@ -63,7 +63,8 @@ export const ImportModal = ({ isOpen, onClose, onPlanManual }: { isOpen: boolean
       
       try {
         let spots: Spot[] = [];
-        if (file.type.startsWith('video/')) {
+        const isVideo = file.type === 'video/mp4' || file.type === 'video/quicktime' || file.type === 'video/mov';
+        if (isVideo) {
           spots = await geminiService.analyzeReelVideo(base64, file.type);
         } else {
           const result = await geminiService.analyzeImageForSpots(base64);

@@ -1,18 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
+import { signOut, deleteUser } from 'firebase/auth';
+import { auth, db } from '../../firebase';
+import { doc, deleteDoc } from 'firebase/firestore';
 import { useApp } from '../../store/AppContext';
 import { useToast } from '../../store/ToastContext';
-import { MapPin, Calendar, Plus, Compass, Heart, User, ChevronRight, Sparkles, X, Trash2, Mail, MessageCircle, Star as StarIcon, Share, Shield, FileText as FileIcon, LogOut, Instagram, Video, Info, Pencil } from 'lucide-react';
+import { MapPin, Calendar, Plus, Compass, Heart, User, ChevronRight, Sparkles, X, Trash2, Mail, MessageCircle, Star as StarIcon, Share, Shield, FileText as FileIcon, LogOut, Instagram, Video, Info, Pencil, Bookmark } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { geminiService } from '../../services/geminiService';
 import ReactMarkdown from 'react-markdown';
 import { Spot } from '../../services/geminiService';
+import { ImportHistoryModal } from '../import/ImportHistoryModal';
 
 export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, onPlanTrip: (destination?: string, spots?: Spot[], duration?: number) => void }) => {
-  const { trips, savedSpots, user, setCurrentTrip, deleteTrip } = useApp();
+  const { trips, savedSpots, user, setCurrentTrip, deleteTrip, addSearch, searchHistory } = useApp();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('home');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isImportHistoryOpen, setIsImportHistoryOpen] = useState(false);
   const [chatQuery, setChatQuery] = useState('');
   const [chatResponse, setChatResponse] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -23,13 +28,39 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   const [editName, setEditName] = useState(user?.name || 'DURGA VENKATA PRASAD CHITIKINA');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [tripToDelete, setTripToDelete] = useState<string | null>(null);
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [showAllTrips, setShowAllTrips] = useState(false);
+  const [showAllGuides, setShowAllGuides] = useState(false);
+  const [showAllSocial, setShowAllSocial] = useState(false);
+  const [selectedSpots, setSelectedSpots] = useState<Spot[]>([]);
   const [isPlanningFromSaved, setIsPlanningFromSaved] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullY, setPullY] = useState(0);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const startY = React.useRef(0);
   const { setUser } = useApp();
+  
+  const toggleSpotSelection = (spot: Spot) => {
+    setSelectedSpots(prev => 
+      prev.find(s => s.id === spot.id) 
+        ? prev.filter(s => s.id !== spot.id)
+        : [...prev, spot]
+    );
+  };
+
+  const handlePlanTripFromSavedSpots = async () => {
+    const spotsToPlan = selectedSpots.length > 0 ? selectedSpots : savedSpots;
+    if (spotsToPlan.length === 0) return;
+    setIsPlanningFromSaved(true);
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    setIsPlanningFromSaved(false);
+    handlePlanTrip(undefined, spotsToPlan);
+    setSelectedSpots([]); // Clear selection after planning
+  };
+  
+  const { scrollYProgress } = useScroll({ container: scrollRef });
+  const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
+  const scale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (scrollRef.current && scrollRef.current.scrollTop === 0) {
@@ -59,9 +90,54 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   };
 
   const handleSaveProfile = () => {
+    if (!editName.trim()) {
+      showToast("Name cannot be empty");
+      return;
+    }
+    if (editName.length > 50) {
+      showToast("Name is too long");
+      return;
+    }
+    if (editBio.length > 200) {
+      showToast("Bio is too long");
+      return;
+    }
     setUser({ ...user, name: editName, bio: editBio, avatar: user?.avatar || '' });
     setIsEditingProfile(false);
     showToast("Profile updated successfully");
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      showToast("Signed out successfully");
+    } catch (error) {
+      console.error("Error signing out", error);
+      showToast("Error signing out");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        await deleteDoc(doc(db, 'users', user.uid));
+        await deleteUser(user);
+        showToast("Account deleted successfully");
+        setShowDeleteAccountConfirm(false);
+      }
+    } catch (error) {
+      console.error("Error deleting account", error);
+      showToast("Error deleting account");
+      setShowDeleteAccountConfirm(false);
+    }
+  };
+
+  const handlePlanTrip = (destination?: string, spots?: Spot[], duration?: number) => {
+    if (destination) {
+      addSearch(destination);
+    }
+    onPlanTrip(destination, spots, duration);
   };
 
   const handleChat = async () => {
@@ -96,71 +172,65 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
     if (selectedSavedSpot) {
       const dest = selectedSavedSpot.name;
       setSelectedSavedSpot(null);
-      onPlanTrip(dest);
+      handlePlanTrip(dest);
       showToast(`Planning trip to ${dest}`);
     }
   };
 
-  const handlePlanTripFromSavedSpots = async () => {
-    if (savedSpots.length === 0) return;
-    setIsPlanningFromSaved(true);
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    setIsPlanningFromSaved(false);
-    onPlanTrip(undefined, savedSpots);
-  };
-
   const guides = [
-    { id: '1', title: '3-Day Taj Mahal & Agra', destination: 'Agra, India', spots: 8, image: 'https://picsum.photos/seed/agra/400/600' },
-    { id: '2', title: '4-Day Jaipur Royal Trip', destination: 'Jaipur, India', spots: 12, image: 'https://picsum.photos/seed/jaipur/400/600' },
-    { id: '3', title: '5-Day Goa Beaches', destination: 'Goa, India', spots: 15, image: 'https://picsum.photos/seed/goa/400/600' },
-    { id: '4', title: '4-Day Kerala Backwaters', destination: 'Kerala, India', spots: 10, image: 'https://picsum.photos/seed/kerala/400/600' },
-    { id: '5', title: '3-Day Varanasi Spiritual', destination: 'Varanasi, India', spots: 9, image: 'https://picsum.photos/seed/varanasi/400/600' },
-    { id: '6', title: '6-Day Ladakh Adventure', destination: 'Ladakh, India', spots: 14, image: 'https://picsum.photos/seed/ladakh/400/600' },
-    { id: '7', title: '3-Day Rishikesh Yoga', destination: 'Rishikesh, India', spots: 8, image: 'https://picsum.photos/seed/rishikesh/400/600' },
-    { id: '8', title: '2-Day Hampi Ruins', destination: 'Hampi, India', spots: 11, image: 'https://picsum.photos/seed/hampi/400/600' },
-    { id: '9', title: '4-Day Darjeeling Tea', destination: 'Darjeeling, India', spots: 10, image: 'https://picsum.photos/seed/darjeeling/400/600' },
-    { id: '10', title: '5-Day Andaman Islands', destination: 'Andaman Islands, India', spots: 12, image: 'https://picsum.photos/seed/andaman/400/600' },
+    { id: '1', title: '3-Day Taj Mahal & Agra', destination: 'Agra, India', spots: 8, image: 'https://loremflickr.com/600/400/Agra,India' },
+    { id: '2', title: '4-Day Jaipur Royal Trip', destination: 'Jaipur, India', spots: 12, image: 'https://loremflickr.com/600/400/Jaipur,India' },
+    { id: '3', title: '5-Day Goa Beaches', destination: 'Goa, India', spots: 15, image: 'https://loremflickr.com/600/400/Goa,India,beach' },
+    { id: '4', title: '4-Day Kerala Backwaters', destination: 'Kerala, India', spots: 10, image: 'https://loremflickr.com/600/400/Kerala,India,backwaters' },
+    { id: '5', title: '3-Day Varanasi Spiritual', destination: 'Varanasi, India', spots: 9, image: 'https://loremflickr.com/600/400/Varanasi,India' },
+    { id: '6', title: '6-Day Ladakh Adventure', destination: 'Ladakh, India', spots: 14, image: 'https://loremflickr.com/600/400/Ladakh,India' },
+    { id: '7', title: '3-Day Rishikesh Yoga', destination: 'Rishikesh, India', spots: 8, image: 'https://loremflickr.com/600/400/Rishikesh,India' },
+    { id: '8', title: '2-Day Hampi Ruins', destination: 'Hampi, India', spots: 11, image: 'https://loremflickr.com/600/400/Hampi,India' },
+    { id: '9', title: '4-Day Darjeeling Tea', destination: 'Darjeeling, India', spots: 10, image: 'https://loremflickr.com/600/400/Darjeeling,India' },
+    { id: '10', title: '5-Day Andaman Islands', destination: 'Andaman Islands, India', spots: 12, image: 'https://loremflickr.com/600/400/Andaman,Islands,India' },
   ];
 
-  const [socialFeed, setSocialFeed] = useState([
-    { id: 's1', platform: 'Instagram', author: '@wanderlust_daily', image: 'https://picsum.photos/seed/kyoto/400/600', caption: 'Hidden temples in Kyoto 🌸 #japan #travel', likes: '12.4k', location: 'Kyoto' },
-    { id: 's2', platform: 'TikTok', author: '@travelhacks', image: 'https://picsum.photos/seed/amalfi/400/600', caption: 'How to do Amalfi Coast on a budget 🍋 #italy', likes: '89k', location: 'Amalfi Coast' },
-    { id: 's3', platform: 'Instagram', author: '@foodie_explorer', image: 'https://picsum.photos/seed/bangkok/400/600', caption: 'Best street food in Bangkok 🍜 You must try this!', likes: '5.2k', location: 'Bangkok' },
-    { id: 's4', platform: 'TikTok', author: '@scenic_routes', image: 'https://picsum.photos/seed/swiss/400/600', caption: 'Taking the Glacier Express through Switzerland 🏔️', likes: '210k', location: 'Switzerland' },
-  ]);
-  const [isLoadingSocial, setIsLoadingSocial] = useState(false);
+  const [nearbySpots, setNearbySpots] = useState<Spot[]>([]);
+  const [isLoadingNearby, setIsLoadingNearby] = useState(false);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [showNearby, setShowNearby] = useState(false);
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      setIsLoadingSocial(true);
+    if (navigator.geolocation && user) {
       navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const posts = await geminiService.getLocalSocialInspiration(position.coords.latitude, position.coords.longitude);
-            if (posts && posts.length > 0) {
-              setSocialFeed(posts.map((p, i) => ({
-                id: `local-${i}`,
-                platform: i % 2 === 0 ? 'Instagram' : 'TikTok',
-                author: p.author,
-                image: p.image,
-                caption: p.caption,
-                likes: p.likes,
-                location: p.location
-              })));
-            }
-          } catch (e) {
-            console.error("Failed to load local social inspiration", e);
-          } finally {
-            setIsLoadingSocial(false);
-          }
+        (position) => {
+          setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
         },
         (error) => {
-          console.error("Geolocation error", error);
-          setIsLoadingSocial(false);
+          console.error("Geolocation error, using fallback location", error);
+          setUserLocation({ lat: 40.7128, lng: -74.0060 });
         }
       );
+    } else if (user) {
+      setUserLocation({ lat: 40.7128, lng: -74.0060 });
     }
-  }, []);
+  }, [user]);
+
+  const fetchNearby = async (lat: number, lng: number) => {
+    try {
+      setIsLoadingNearby(true);
+      const nearby = await geminiService.getNearbySpots(lat, lng);
+      setNearbySpots(nearby);
+      setShowNearby(true);
+    } catch (e) {
+      console.error("Failed to load nearby spots", e);
+    } finally {
+      setIsLoadingNearby(false);
+    }
+  };
+
+  const handleNearbyClick = () => {
+    if (nearbySpots.length > 0) {
+      setShowNearby(!showNearby);
+    } else if (userLocation) {
+      fetchNearby(userLocation.lat, userLocation.lng);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -190,7 +260,7 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
         {/* Header (Mobile) */}
-        <div className="md:hidden px-6 pt-14 pb-4 bg-white flex items-center justify-between z-10">
+        <div className="md:hidden px-6 py-3 bg-white flex items-center justify-between z-10 h-[60px]">
           <h1 className="text-3xl font-display font-bold text-brand">Wayfinder Ai</h1>
           <div className="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center text-brand font-bold border-2 border-white shadow-sm">
             {user?.name?.[0] || 'D'}
@@ -198,7 +268,7 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
         </div>
 
         {/* Header (Desktop) */}
-        <div className="hidden md:flex px-8 pt-8 pb-4 items-center justify-end z-10">
+        <div className="hidden md:flex px-8 pt-4 pb-4 items-center justify-end z-10">
           <div className="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center text-brand font-bold border-2 border-white shadow-sm">
             {user?.name?.[0] || 'D'}
           </div>
@@ -227,16 +297,16 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
           <div style={{ transform: `translateY(${isRefreshing ? 60 : pullY}px)`, transition: isRefreshing ? 'transform 0.3s ease' : 'none' }}>
             <AnimatePresence mode="wait">
             {activeTab === 'home' && (
-            <motion.div 
-              key="home"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
-              className="max-w-6xl mx-auto"
-            >
+              <motion.div 
+                key="home"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.2 }}
+                className="max-w-6xl mx-auto"
+              >
             {/* Chat with Wayfinder Ai */}
-            <section className="mt-8">
+            <section className="mt-4">
               <button 
                 onClick={() => setIsChatOpen(true)}
                 className="w-full bg-slate-900 text-white p-6 rounded-3xl flex items-center justify-between shadow-xl shadow-slate-200"
@@ -258,9 +328,11 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
             <section className="mt-8">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-slate-800">Top 10 Places in India</h2>
-                <button onClick={() => showToast("Viewing all travel guides")} className="text-brand text-sm font-semibold">View all</button>
+                <button onClick={() => setShowAllGuides(!showAllGuides)} className="text-brand text-sm font-semibold">
+                  {showAllGuides ? "View less" : "View all"}
+                </button>
               </div>
-              <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 -mx-6 px-6">
+              <div className={cn("gap-4 pb-4", showAllGuides ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "flex overflow-x-auto custom-scrollbar -mx-6 px-6")}>
                 {guides.map(guide => (
                   <motion.div 
                     key={guide.id}
@@ -269,9 +341,9 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                       showToast(`Planning ${guide.title}`);
                       const durationMatch = guide.title.match(/(\d+)-Day/);
                       const duration = durationMatch ? parseInt(durationMatch[1]) : 3;
-                      onPlanTrip(guide.destination, undefined, duration);
+                      handlePlanTrip(guide.destination, undefined, duration);
                     }}
-                    className="flex-shrink-0 w-40 h-56 relative rounded-2xl overflow-hidden shadow-md cursor-pointer"
+                    className={cn("relative rounded-2xl overflow-hidden shadow-md cursor-pointer", showAllGuides ? "w-full aspect-[3/4]" : "flex-shrink-0 w-40 h-56")}
                   >
                     <img src={guide.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent p-4 flex flex-col justify-end">
@@ -283,49 +355,50 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
               </div>
             </section>
 
-            {/* Social Inspiration Feed */}
+            {/* Nearby Places */}
             <section className="mt-8">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  Social Inspiration
-                  {isLoadingSocial && <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />}
-                </h2>
-                <button onClick={() => showToast("Viewing all social inspiration")} className="text-brand text-sm font-semibold">View all</button>
+                <button 
+                  onClick={handleNearbyClick}
+                  className="bg-brand text-white px-4 py-2 rounded-xl shadow-md font-semibold flex items-center gap-2 hover:bg-brand-dark transition-all"
+                >
+                  Nearby Places
+                  {isLoadingNearby && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                </button>
+                {showNearby && nearbySpots.length > 0 && (
+                  <button onClick={() => showToast("These are the places that are nearby to you.")} className="p-1 hover:bg-slate-100 rounded-full transition-colors">
+                    <Info size={16} className="text-brand" />
+                  </button>
+                )}
               </div>
-              <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 -mx-6 px-6">
-                {socialFeed.map(post => (
-                  <motion.div 
-                    key={post.id}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      showToast(`Planning trip inspired by ${post.author}`);
-                      onPlanTrip(post.location);
-                    }}
-                    className="flex-shrink-0 w-48 h-72 relative rounded-3xl overflow-hidden shadow-md group cursor-pointer"
-                  >
-                    <img src={post.image} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" referrerPolicy="no-referrer" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-4 flex flex-col justify-between">
-                      <div className="flex justify-end">
-                        <div className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white">
-                          {post.platform === 'Instagram' ? <Instagram size={16} /> : <Video size={16} />}
-                        </div>
+              {showNearby && (
+                <div className="flex overflow-x-auto custom-scrollbar -mx-6 px-6 gap-4 pb-4">
+                  {nearbySpots.map((spot, index) => (
+                    <motion.div 
+                      key={spot.id}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleSavedSpotClick(spot)}
+                      className="relative rounded-3xl overflow-hidden shadow-md group cursor-pointer flex-shrink-0 w-48 h-72"
+                    >
+                      <img src={spot.imageUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-4 flex flex-col justify-end">
+                        <div className="text-white font-bold text-sm line-clamp-2 leading-tight">{spot.name}</div>
+                        <div className="text-white/70 text-[10px] mt-1">{spot.category}</div>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden">
-                            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author}`} alt="avatar" />
-                          </div>
-                          <div className="text-white text-[10px] font-bold">{post.author}</div>
-                        </div>
-                        <div className="text-white/90 text-xs line-clamp-2 leading-tight mb-2">{post.caption}</div>
-                        <div className="text-white/60 text-[10px] font-medium flex items-center gap-1">
-                          <Heart size={10} className="fill-white/60" /> {post.likes}
-                        </div>
+                    </motion.div>
+                  ))}
+                  {isLoadingNearby && nearbySpots.length === 0 && (
+                    [1, 2, 3].map(i => (
+                      <div key={i} className="flex-shrink-0 w-48 h-72 bg-slate-200 rounded-3xl overflow-hidden shadow-md animate-pulse">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                    ))
+                  )}
+                </div>
+              )}
             </section>
 
               {/* My Trips */}
@@ -352,7 +425,7 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                         className="bg-slate-200 p-2 rounded-3xl flex items-center gap-3 cursor-pointer hover:bg-slate-300 transition-colors"
                       >
                       <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0">
-                        <img src={`https://picsum.photos/seed/${trip.destination}/200/200`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img src={trip.spots?.[0]?.imageUrl || `https://loremflickr.com/600/400/${encodeURIComponent(trip.destination.split(' ').join(','))}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                       <div className="flex-1 bg-white rounded-2xl p-3 flex items-center justify-between">
                         <div className="flex flex-col justify-center">
@@ -390,6 +463,28 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                 </div>
               )}
             </section>
+
+            {/* Search History */}
+            <section className="mt-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-800">Search History</h2>
+              </div>
+              {searchHistory.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {searchHistory.map((destination, index) => (
+                    <button 
+                      key={index}
+                      onClick={() => handlePlanTrip(destination)}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                    >
+                      {destination}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-slate-400 text-sm italic">No recent searches.</div>
+              )}
+            </section>
             </motion.div>
           )}
 
@@ -418,24 +513,59 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                     ) : (
                       <>
                         <Sparkles size={16} />
-                        Plan Trip from Saved
+                        Plan Trip {selectedSpots.length > 0 ? `(${selectedSpots.length})` : 'from Saved'}
                       </>
                     )}
                   </button>
                 )}
               </div>
               {savedSpots.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {savedSpots.map(spot => (
-                    <div key={spot.id} onClick={() => handleSavedSpotClick(spot)} className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer">
-                      <div className="aspect-square rounded-xl overflow-hidden mb-2">
-                        <img src={spot.imageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </div>
-                      <div className="font-bold text-sm truncate">{spot.name}</div>
-                      <div className="text-[10px] text-slate-500">{spot.category}</div>
-                    </div>
-                  ))}
-                </div>
+                <motion.div 
+                  className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"
+                  initial="hidden"
+                  animate="visible"
+                  variants={{
+                    visible: { transition: { staggerChildren: 0.1 } }
+                  }}
+                >
+                  {savedSpots.map(spot => {
+                    const isSelected = selectedSpots.some(s => s.id === spot.id);
+                    return (
+                      <motion.div 
+                        key={spot.id} 
+                        variants={{
+                          hidden: { opacity: 0, y: 20 },
+                          visible: { opacity: 1, y: 0 }
+                        }}
+                        onClick={() => toggleSpotSelection(spot)}
+                        className={cn(
+                          "bg-white p-3 rounded-2xl shadow-sm border transition-all cursor-pointer relative",
+                          isSelected ? "border-brand ring-2 ring-brand/20" : "border-slate-100 hover:shadow-md"
+                        )}
+                      >
+                        <div className="aspect-square rounded-xl overflow-hidden mb-2 relative">
+                          <img 
+                            src={spot.imageUrl} 
+                            className="w-full h-full object-cover" 
+                            referrerPolicy="no-referrer" 
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(spot.name)}/400/400`;
+                            }}
+                          />
+                          {isSelected && (
+                            <div className="absolute inset-0 bg-brand/30 flex items-center justify-center backdrop-blur-[2px]">
+                              <div className="bg-white text-brand rounded-full p-1.5 shadow-lg">
+                                <Sparkles size={18} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="font-bold text-sm truncate">{spot.name}</div>
+                        <div className="text-[10px] text-slate-500">{spot.category}</div>
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
               ) : (
               <div className="text-center py-20 text-slate-400">
                 <Heart size={48} className="mx-auto mb-4 opacity-20" />
@@ -521,36 +651,42 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
               </div>
 
               {/* Import History */}
-              <button onClick={() => showToast("Viewing import history")} className="w-full bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm hover:bg-slate-50 transition-colors">
+              <motion.button whileTap={{ scale: 0.98 }} onClick={() => setIsImportHistoryOpen(true)} className="w-full bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-100">
-                    <img src="https://picsum.photos/seed/history/100/100" className="w-full h-full object-cover" alt="History" />
+                    <img src="https://loremflickr.com/100/100/history,travel" className="w-full h-full object-cover" alt="History" />
                   </div>
                   <span className="font-bold text-slate-700">Import History</span>
                 </div>
                 <ChevronRight size={20} className="text-slate-400" />
-              </button>
+              </motion.button>
+              
+              <ImportHistoryModal isOpen={isImportHistoryOpen} onClose={() => setIsImportHistoryOpen(false)} />
             
               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                <button onClick={() => window.location.href = 'mailto:support@wayfinder.ai'} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                <motion.button whileTap={{ scale: 0.98 }} onClick={() => window.location.href = 'mailto:support@wayfinder.ai'} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
                   <Mail size={20} className="text-slate-400" />
                   <span className="font-medium text-slate-700">Email Us</span>
-                </button>
-                <button onClick={() => showToast("Joining community")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.98 }} onClick={() => showToast("Joining community")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
                   <MessageCircle size={20} className="text-slate-400" />
                   <span className="font-medium text-slate-700">Join Community</span>
-                </button>
-                <button onClick={() => showToast("Leaving a review")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.98 }} onClick={() => showToast("Leaving a review")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
                   <StarIcon size={20} className="text-slate-400" />
                   <span className="font-medium text-slate-700">Leave a Review</span>
-                </button>
-                <button onClick={() => showToast("Sharing Wayfinder")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.98 }} onClick={() => showToast("Sharing Wayfinder")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
                   <Share size={20} className="text-slate-400" />
                   <span className="font-medium text-slate-700">Share Wayfinder</span>
-                </button>
+                </motion.button>
               </div>
 
               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                <button onClick={() => showToast("Preferences opened")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                  <Bookmark size={20} className="text-slate-400" />
+                  <span className="font-medium text-slate-700">Preferences</span>
+                </button>
                 <button onClick={() => showToast("Viewing Privacy Policy")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
                   <Shield size={20} className="text-slate-400" />
                   <span className="font-medium text-slate-700">Privacy Policy</span>
@@ -559,11 +695,11 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                   <FileIcon size={20} className="text-slate-400" />
                   <span className="font-medium text-slate-700">Terms of Use</span>
                 </button>
-                <button onClick={() => showToast("Signing out")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                <button onClick={handleSignOut} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
                   <LogOut size={20} className="text-slate-400" />
                   <span className="font-medium text-slate-700">Sign Out</span>
                 </button>
-                <button onClick={() => { showToast('Account deletion requested'); }} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors text-red-500">
+                <button onClick={() => setShowDeleteAccountConfirm(true)} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors text-red-500">
                   <Trash2 size={20} />
                   <span className="font-medium">Delete Account</span>
                 </button>
@@ -583,6 +719,27 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
             <Plus size={28} strokeWidth={3} />
           </button>
         </div>
+
+        {/* Confirmation Modal */}
+        <AnimatePresence>
+          {showDeleteAccountConfirm && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full"
+              >
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Delete Account</h3>
+                <p className="text-slate-600 mb-6">Are you sure you want to delete your account? This action cannot be undone.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowDeleteAccountConfirm(false)} className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-bold">Cancel</button>
+                  <button onClick={handleDeleteAccount} className="flex-1 bg-red-500 text-white py-3 rounded-xl font-bold">Delete</button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Bottom Nav (Mobile) */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex items-center justify-around z-20 pb-safe">
@@ -711,6 +868,13 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                           ))}
                         </div>
                       )}
+                      <button
+                        onClick={handlePlanTripFromSpot}
+                        className="w-full mt-6 py-3 bg-brand text-white font-bold rounded-xl hover:bg-brand/90 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
+                      >
+                        <Plus size={18} />
+                        Add to Trip
+                      </button>
                     </section>
 
                     <section>

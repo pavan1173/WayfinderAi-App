@@ -1,9 +1,18 @@
 import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMap, Polyline, Circle, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap, Polyline, Circle, LayersControl, Popup } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Spot } from '../../services/geminiService';
 import { ArrowUp } from 'lucide-react';
+
+// Fix for default marker icon
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 // Custom Numbered Icon Generator
 const createNumberedIcon = (number: number, color: string = '#3B82F6', isNearby: boolean = false, isActive: boolean = false) => {
@@ -38,6 +47,7 @@ interface MapViewProps {
   showRoute?: boolean;
   orderedSpots?: Spot[];
   nearbySpots?: Spot[];
+  currentDay?: number;
   onSpotClick?: (spot: Spot) => void;
   onAddNearbySpot?: (spot: Spot) => void;
 }
@@ -79,7 +89,7 @@ const MapController = ({
   return null;
 };
 
-export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalActiveSpot, showRoute, orderedSpots, nearbySpots = [], onSpotClick, onAddNearbySpot }) => {
+export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalActiveSpot, showRoute, orderedSpots, nearbySpots = [], currentDay, onSpotClick, onAddNearbySpot }) => {
   const [localActiveSpot, setLocalActiveSpot] = React.useState<Spot | null>(null);
   const activeSpot = externalActiveSpot || localActiveSpot;
 
@@ -221,18 +231,55 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
         )}
 
         {/* Main Trip Spots */}
-        {validSpots.map((spot, index) => {
-          let color = '#3B82F6'; // Blue
-          if (index === 0) color = '#10B981'; // Green for start
-          else if (index === validSpots.length - 1) color = '#EF4444'; // Red for end
-          else if (index % 3 === 1) color = '#8B5CF6'; // Purple
-          else if (index % 3 === 2) color = '#F59E0B'; // Amber
+        <MarkerClusterGroup>
+          {validSpots.map((spot, index) => {
+            let color = '#3B82F6'; // Blue
+            if (index === 0) color = '#10B981'; // Green for start
+            else if (index === validSpots.length - 1) color = '#EF4444'; // Red for end
+            else if (index % 3 === 1) color = '#8B5CF6'; // Purple
+            else if (index % 3 === 2) color = '#F59E0B'; // Amber
 
-          return (
+            return (
+              <Marker 
+                key={`trip-spot-${spot.id}-${index}`} 
+                position={[spot.lat!, spot.lng!]}
+                icon={createNumberedIcon(index + 1, activeSpot?.id === spot.id ? '#F59E0B' : color, false, activeSpot?.id === spot.id)}
+                draggable={true}
+                eventHandlers={{
+                  click: () => {
+                    setLocalActiveSpot(spot);
+                    if (onSpotClick) {
+                      onSpotClick(spot);
+                    }
+                  },
+                  dragend: (e) => {
+                    const marker = e.target;
+                    const position = marker.getLatLng();
+                    console.log('New position:', position);
+                    // Here we would need a callback to update the spot's coordinates
+                  }
+                }}
+                zIndexOffset={activeSpot?.id === spot.id ? 1000 : 0}
+              >
+                <Popup className="custom-popup">
+                  <div className="flex flex-col gap-1 p-2">
+                    <div className="font-bold text-lg">{spot.name}</div>
+                    <div className="text-sm text-slate-600">{spot.category}</div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+        </MarkerClusterGroup>
+
+        {/* Nearby Spots */}
+        <MarkerClusterGroup>
+          {nearbySpots.map((spot, index) => (
             <Marker 
-              key={spot.id} 
+              key={`nearby-spot-${spot.id}-${index}`} 
               position={[spot.lat!, spot.lng!]}
-              icon={createNumberedIcon(index + 1, activeSpot?.id === spot.id ? '#F59E0B' : color, false, activeSpot?.id === spot.id)}
+              icon={createNumberedIcon(0, '#F59E0B', true, activeSpot?.id === spot.id)}
+              draggable={true}
               eventHandlers={{
                 click: () => {
                   setLocalActiveSpot(spot);
@@ -240,29 +287,34 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
                     onSpotClick(spot);
                   }
                 },
-              }}
-              zIndexOffset={activeSpot?.id === spot.id ? 1000 : 0}
-            />
-          );
-        })}
-
-        {/* Nearby Spots */}
-        {nearbySpots.map((spot) => (
-          <Marker 
-            key={spot.id} 
-            position={[spot.lat!, spot.lng!]}
-            icon={createNumberedIcon(0, '#F59E0B', true, activeSpot?.id === spot.id)}
-            eventHandlers={{
-              click: () => {
-                setLocalActiveSpot(spot);
-                if (onSpotClick) {
-                  onSpotClick(spot);
+                dragend: (e) => {
+                  const marker = e.target;
+                  const position = marker.getLatLng();
+                  console.log('New position:', position);
                 }
-              },
-            }}
-            zIndexOffset={activeSpot?.id === spot.id ? 1000 : -100}
-          />
-        ))}
+              }}
+              zIndexOffset={activeSpot?.id === spot.id ? 1000 : -100}
+            >
+              <Popup className="custom-popup">
+                <div className="flex flex-col gap-2 min-w-[150px] p-2">
+                  <div className="font-bold text-lg">{spot.name}</div>
+                  <div className="text-sm text-slate-600">{spot.category}</div>
+                  {onAddNearbySpot && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddNearbySpot(spot);
+                      }}
+                      className="bg-brand text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-brand/90 transition-colors w-full text-center"
+                    >
+                      Add to {currentDay ? `Day ${currentDay}` : 'Current Day'}
+                    </button>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MarkerClusterGroup>
 
         <MapController activeSpot={activeSpot} spots={validSpots} />
       </MapContainer>

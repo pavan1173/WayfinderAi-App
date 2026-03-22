@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, Share2, Edit2, Map as MapIcon, List, Clock, Navigation, Info, X, Star, Globe, Phone, MapPin, Music, Sparkles, Save, Check, Zap, Plus, ExternalLink, Utensils, Landmark, Camera, Tent, ShoppingBag, Coffee, Calendar } from 'lucide-react';
+import { motion, AnimatePresence, useDragControls } from 'motion/react';
+import { ChevronLeft, ChevronRight, Share2, Edit2, Map as MapIcon, List, Clock, Navigation, Info, X, Star, Globe, Phone, MapPin, Music, Sparkles, Save, Check, Zap, Plus, ExternalLink, Utensils, Landmark, Camera, Tent, ShoppingBag, Coffee, Calendar } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useToast } from '../../store/ToastContext';
-import { Spot, Trip, geminiService } from '../../services/geminiService';
+import { Spot, Trip, geminiService, getWikipediaImage } from '../../services/geminiService';
 import { cn } from '../../lib/utils';
 import { MapView } from './MapView';
 import ReactMarkdown from 'react-markdown';
@@ -13,9 +13,11 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
   const currentTrip = trip;
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'overview' | 'itinerary' | 'discover'>('overview');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [activeDay, setActiveDay] = useState<number>(1);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [isReading, setIsReading] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [isSaved, setIsSaved] = useState(() => trips.some(t => t.id === trip.id));
   const [isEditing, setIsEditing] = useState(false);
   const [editedDestination, setEditedDestination] = useState('');
   const [editedDates, setEditedDates] = useState('');
@@ -31,6 +33,9 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
   const [isGettingFastInfo, setIsGettingFastInfo] = useState(false);
   const [discoverInfo, setDiscoverInfo] = useState<string | null>(null);
   const [isGettingDiscoverInfo, setIsGettingDiscoverInfo] = useState(false);
+  const [socialLink, setSocialLink] = useState('');
+  const [isAnalyzingLink, setIsAnalyzingLink] = useState(false);
+  const [discoveredPlaces, setDiscoveredPlaces] = useState<Spot[]>([]);
   const [promptModal, setPromptModal] = useState<{ isOpen: boolean, title: string, onSubmit: (val: string) => void, onCancel: () => void }>({ isOpen: false, title: '', onSubmit: () => {}, onCancel: () => {} });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +51,30 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
       setIsSaved(false);
     }
   }, [currentTrip, trips]);
+
+  React.useEffect(() => {
+    if (!selectedSpot && currentTrip) {
+      const activeDayData = currentTrip.itinerary.find(d => d.day === activeDay);
+      if (activeDayData && activeDayData.spots.length > 0) {
+        const firstSpot = activeDayData.spots[0];
+        if (firstSpot.lat && firstSpot.lng) {
+          const timer = setTimeout(() => {
+            setIsGettingNearby(true);
+            geminiService.getNearbySpots(firstSpot.lat!, firstSpot.lng!)
+              .then(nearby => {
+                const uniqueNearby = nearby.filter((s, index, self) => 
+                  index === self.findIndex((t) => t.id === s.id)
+                );
+                setNearbySpots(uniqueNearby);
+              })
+              .catch(console.error)
+              .finally(() => setIsGettingNearby(false));
+          }, 500);
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [activeDay, selectedSpot, currentTrip]);
 
   React.useEffect(() => {
     if (activeTab === 'discover' && !discoverInfo && !isGettingDiscoverInfo && currentTrip) {
@@ -87,9 +116,34 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
   };
 
   const scrollToDay = (dayNumber: number) => {
+    setActiveDay(dayNumber);
     const element = document.getElementById(`day-${dayNumber}`);
     if (element && scrollContainerRef.current) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleScroll = () => {
+    if (!scrollContainerRef.current || !currentTrip) return;
+    
+    let currentDay = activeDay;
+    let minDistance = Infinity;
+    
+    for (const day of currentTrip.itinerary) {
+      const element = document.getElementById(`day-${day.day}`);
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        // Calculate distance from the top of the viewport
+        // We want the element that is closest to the top, but could be slightly above it
+        const distance = Math.abs(rect.top - 100); // 100px offset for header
+        if (distance < minDistance) {
+          minDistance = distance;
+          currentDay = day.day;
+        }
+      }
+    }
+    if (currentDay !== activeDay) {
+      setActiveDay(currentDay);
     }
   };
 
@@ -126,7 +180,9 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     setIsGettingSavedSpotDetails(true);
     
     // Get fast info first
-    geminiService.getFastSpotInfo(spot.name).then(info => {
+    const queryName = currentTrip ? `${spot.name} in ${currentTrip.destination}` : spot.name;
+    
+    geminiService.getFastSpotInfo(queryName).then(info => {
       setFastInfo(info);
       setIsGettingFastInfo(false);
     }).catch(() => setIsGettingFastInfo(false));
@@ -140,23 +196,29 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     }
 
     // Get saved spot details (basic details, new things, upcoming events)
-    geminiService.getSavedSpotDetails(spot.name).then(details => {
+    geminiService.getSavedSpotDetails(queryName).then(details => {
       setSavedSpotDetails(details);
       setIsGettingSavedSpotDetails(false);
     }).catch(() => setIsGettingSavedSpotDetails(false));
 
     // Then get full maps details
     try {
-      const details = await geminiService.getSpotDetailsWithMaps(spot.name);
+      const location = spot.lat && spot.lng ? { lat: spot.lat, lng: spot.lng } : undefined;
+      const details = await geminiService.getSpotDetailsWithMaps(queryName, location);
       setSpotDetails(details);
       setSelectedSpot(prev => prev ? { ...prev, ...details } : prev);
 
       // Fetch nearby spots
-      if (details.lat && details.lng) {
+      const searchLat = spot.lat || details.lat;
+      const searchLng = spot.lng || details.lng;
+      if (searchLat && searchLng) {
         setIsGettingNearby(true);
         try {
-          const nearby = await geminiService.getNearbySpots(details.lat, details.lng);
-          setNearbySpots(nearby);
+          const nearby = await geminiService.getNearbySpots(searchLat, searchLng, spot.category);
+          const uniqueNearby = nearby.filter((s, index, self) => 
+            index === self.findIndex((t) => t.id === s.id)
+          );
+          setNearbySpots(uniqueNearby);
         } catch (e) {
           console.error("Failed to get nearby spots", e);
         } finally {
@@ -180,21 +242,28 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     const updatedTrip = {
       ...currentTrip,
       spots: [...currentTrip.spots, newSpot],
-      itinerary: currentTrip.itinerary.map(day => ({ ...day, spots: [...day.spots] }))
+      itinerary: currentTrip.itinerary.map(day => {
+        if (day.day === activeDay) {
+          return { ...day, spots: [...day.spots, newSpot] };
+        }
+        return { ...day, spots: [...day.spots] };
+      })
     };
     
-    // Add to the last day by default, or create day 1 if empty
-    if (updatedTrip.itinerary.length > 0) {
-      updatedTrip.itinerary[updatedTrip.itinerary.length - 1].spots.push(newSpot);
-    } else {
-      updatedTrip.itinerary.push({ day: 1, spots: [newSpot] });
+    // Add to activeDay, or create day 1 if empty
+    if (!updatedTrip.itinerary.find(d => d.day === activeDay)) {
+      if (updatedTrip.itinerary.length > 0) {
+        updatedTrip.itinerary[updatedTrip.itinerary.length - 1].spots.push(newSpot);
+      } else {
+        updatedTrip.itinerary.push({ day: 1, spots: [newSpot] });
+      }
     }
     
     setCurrentTrip(updatedTrip);
     if (trips.find(t => t.id === currentTrip.id)) {
       addTrip(updatedTrip);
     }
-    showToast(`Added ${spot.name} to your trip!`);
+    showToast(`Added ${spot.name} to Day ${activeDay}!`);
   };
 
   const handleShare = async () => {
@@ -240,7 +309,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
           name: name,
           description: "Loading details...",
           category: "...",
-          imageUrl: `https://picsum.photos/seed/${name.replace(/\s/g, '')}/400/300`
+          imageUrl: await getWikipediaImage(name)
         };
 
         // Optimistic update
@@ -284,6 +353,18 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     });
   };
 
+  const handleAddSpot = (spot: Spot) => {
+    if (!currentTrip) return;
+    const updatedItinerary = [...currentTrip.itinerary];
+    if (updatedItinerary.length === 0) {
+      updatedItinerary.push({ day: 1, spots: [spot] });
+    } else {
+      updatedItinerary[0].spots.push(spot);
+    }
+    setCurrentTrip({ ...currentTrip, itinerary: updatedItinerary });
+    showToast(`Added ${spot.name} to Day 1`);
+  };
+
   const handleAddSpotToDay = async (dayIndex: number) => {
     setPromptModal({
       isOpen: true,
@@ -298,7 +379,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
           name: name,
           description: "Loading details...",
           category: "...",
-          imageUrl: `https://picsum.photos/seed/${name.replace(/\s/g, '')}/400/300`
+          imageUrl: await getWikipediaImage(name)
         };
 
         // Optimistic update
@@ -367,6 +448,21 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     setIsReading(false);
   };
 
+  const handleAnalyzeLink = async () => {
+    if (!socialLink) return;
+    setIsAnalyzingLink(true);
+    try {
+      const spots = await geminiService.analyzeSocialLink(socialLink);
+      setDiscoveredPlaces(spots);
+      showToast("Analysis complete!");
+      setSocialLink('');
+    } catch (error) {
+      console.error("Error analyzing link:", error);
+      showToast("Failed to analyze link.");
+    }
+    setIsAnalyzingLink(false);
+  };
+
   const openDirections = (spot: Spot) => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(spot.name)}&destination_place_id=${spot.mapsUri?.split('place_id=')[1] || ''}`;
     window.open(url, '_blank');
@@ -382,6 +478,8 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     if (c.includes('cafe')) return <Coffee size={14} className="text-yellow-600" />;
     return <MapPin size={14} className="text-slate-400" />;
   };
+
+  const dragControls = useDragControls();
 
   if (!currentTrip) return null;
 
@@ -400,6 +498,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
           showRoute={true}
           orderedSpots={currentTrip.itinerary.flatMap(day => day.spots)}
           nearbySpots={nearbySpots}
+          currentDay={activeDay}
           onSpotClick={handleSpotClick}
           onAddNearbySpot={handleAddNearbySpot}
         />
@@ -424,119 +523,150 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 md:w-1/2 lg:w-2/5 bg-white -mt-8 md:mt-0 rounded-t-[2.5rem] md:rounded-none shadow-2xl overflow-hidden flex flex-col order-2 md:order-1 z-10">
-        <div className="px-6 pt-8 pb-4">
+      <motion.div 
+        drag="y"
+        dragControls={dragControls}
+        dragListener={false}
+        dragConstraints={{ top: -300, bottom: 0 }}
+        onDragEnd={(event, info) => {
+          if (info.offset.y > 100) {
+            window.location.reload();
+          }
+        }}
+        className={cn(
+          "bg-white -mt-8 md:mt-0 rounded-t-[2.5rem] md:rounded-none shadow-2xl overflow-hidden flex flex-col order-2 md:order-1 z-10 transition-all duration-300",
+          isSidebarOpen ? "flex-1 md:w-1/2 lg:w-2/5" : "w-0 md:w-16"
+        )}
+      >
+        {/* Drag Handle */}
+        <div
+          className="h-12 w-full flex items-center justify-center cursor-grab active:cursor-grabbing bg-white"
+          onPointerDown={(e) => dragControls.start(e)}
+        >
+          <div className="w-12 h-1.5 bg-slate-300 rounded-full" />
+        </div>
+
+        <div className={cn("px-6 pt-2 pb-4 transition-opacity duration-300", isSidebarOpen ? "opacity-100" : "opacity-0 md:opacity-100")}>
           <div className="flex items-center justify-between mb-2">
-            {isEditing ? (
-              <div className="flex items-center flex-1 mr-4">
-                <input 
-                  type="text"
-                  value={editedDestination}
-                  onChange={(e) => setEditedDestination(e.target.value)}
-                  className="text-2xl font-display font-bold text-slate-900 bg-slate-50 border-none focus:ring-2 focus:ring-brand rounded-lg px-2 py-1 w-full"
-                  autoFocus
-                />
-                <span className="text-2xl font-display font-bold text-slate-900 ml-2">Trip</span>
-              </div>
-            ) : (
-              <h1 className="text-2xl font-display font-bold text-slate-900">{currentTrip.destination} Trip</h1>
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors">
+              {isSidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+            </button>
+            {isSidebarOpen && (
+              <>
+                {isEditing ? (
+                  <div className="flex items-center flex-1 mr-4">
+                    <input 
+                      type="text"
+                      value={editedDestination}
+                      onChange={(e) => setEditedDestination(e.target.value)}
+                      className="text-2xl font-display font-bold text-slate-900 bg-slate-50 border-none focus:ring-2 focus:ring-brand rounded-lg px-2 py-1 w-full"
+                      autoFocus
+                    />
+                    <span className="text-2xl font-display font-bold text-slate-900 ml-2">Trip</span>
+                  </div>
+                ) : (
+                  <h1 className="text-2xl font-display font-bold text-slate-900">{currentTrip.destination} Trip</h1>
+                )}
+            <div className={cn("flex gap-2 transition-opacity duration-300", isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none")}>
+                  <button 
+                    onClick={handleSaveTrip}
+                    disabled={isSaved}
+                    className={cn(
+                      "p-2 rounded-full transition-colors",
+                      isSaved ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-600"
+                    )}
+                  >
+                    {isSaved ? <Check size={20} /> : <Save size={20} />}
+                  </button>
+                  <button 
+                    onClick={handleReadItinerary}
+                    disabled={isReading}
+                    className={cn(
+                      "p-2 rounded-full transition-colors",
+                      isReading ? "bg-brand text-white animate-pulse" : "bg-slate-50 text-slate-600"
+                    )}
+                  >
+                    <Music size={20} />
+                  </button>
+                  <button 
+                    onClick={handleShare}
+                    className="p-2 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors"
+                  >
+                    <Share2 size={20} className="text-slate-600" />
+                  </button>
+                </div>
+              </>
             )}
-            <div className="flex gap-2">
-              <button 
-                onClick={handleSaveTrip}
-                disabled={isSaved}
-                className={cn(
-                  "p-2 rounded-full transition-colors",
-                  isSaved ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-600"
-                )}
-              >
-                {isSaved ? <Check size={20} /> : <Save size={20} />}
-              </button>
-              <button 
-                onClick={handleReadItinerary}
-                disabled={isReading}
-                className={cn(
-                  "p-2 rounded-full transition-colors",
-                  isReading ? "bg-brand text-white animate-pulse" : "bg-slate-50 text-slate-600"
-                )}
-              >
-                <Music size={20} />
-              </button>
-              <button 
-                onClick={handleShare}
-                className="p-2 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors"
-              >
-                <Share2 size={20} className="text-slate-600" />
-              </button>
-            </div>
           </div>
-          <div className="text-sm text-slate-500 mb-6">
-            {isEditing ? (
-              <div className="flex items-center gap-2">
-                <input 
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={editedDuration}
-                  onChange={(e) => setEditedDuration(parseInt(e.target.value) || 1)}
-                  className="bg-slate-50 border-none focus:ring-1 focus:ring-brand rounded px-2 py-0.5 text-sm w-16"
-                />
-                <span>days • {currentTrip.spots.length} spots • </span>
-                <input 
-                  type="text"
-                  value={editedDates}
-                  onChange={(e) => setEditedDates(e.target.value)}
-                  placeholder="e.g. Mar 12 - 15"
-                  className="bg-slate-50 border-none focus:ring-1 focus:ring-brand rounded px-2 py-0.5 text-sm"
-                />
+          <div className={cn("transition-opacity duration-300", isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none")}>
+              <div className="text-sm text-slate-500 mb-6">
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={editedDuration}
+                      onChange={(e) => setEditedDuration(parseInt(e.target.value) || 1)}
+                      className="bg-slate-50 border-none focus:ring-1 focus:ring-brand rounded px-2 py-0.5 text-sm w-16"
+                    />
+                    <span>days • {currentTrip.spots.length} spots • </span>
+                    <input 
+                      type="text"
+                      value={editedDates}
+                      onChange={(e) => setEditedDates(e.target.value)}
+                      placeholder="e.g. Mar 12 - 15"
+                      className="bg-slate-50 border-none focus:ring-1 focus:ring-brand rounded px-2 py-0.5 text-sm"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span>{currentTrip.duration} days • {currentTrip.spots.length} spots • {currentTrip.dates || 'Choose dates'}</span>
+                    {currentTrip.budget && <span className="text-emerald-600 font-medium ml-2">• {currentTrip.budget}</span>}
+                    <button onClick={handleToggleEdit} className="text-brand hover:text-brand-dark transition-colors">
+                      <Edit2 size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span>{currentTrip.duration} days • {currentTrip.spots.length} spots • {currentTrip.dates || 'Choose dates'}</span>
-                {currentTrip.budget && <span className="text-emerald-600 font-medium ml-2">• {currentTrip.budget}</span>}
-                <button onClick={handleToggleEdit} className="text-brand hover:text-brand-dark transition-colors">
-                  <Edit2 size={14} />
+
+              {/* Tabs */}
+              <div className="flex border-b border-slate-100">
+                <button 
+                  onClick={() => setActiveTab('overview')}
+                  className={cn(
+                    "flex-1 py-3 font-bold text-sm transition-colors relative",
+                    activeTab === 'overview' ? "text-slate-900" : "text-slate-400"
+                  )}
+                >
+                  Overview
+                  {activeTab === 'overview' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand" />}
+                </button>
+                <button 
+                  onClick={() => setActiveTab('itinerary')}
+                  className={cn(
+                    "flex-1 py-3 font-bold text-sm transition-colors relative",
+                    activeTab === 'itinerary' ? "text-slate-900" : "text-slate-400"
+                  )}
+                >
+                  Itinerary
+                  {activeTab === 'itinerary' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand" />}
+                </button>
+                <button 
+                  onClick={() => setActiveTab('discover')}
+                  className={cn(
+                    "flex-1 py-3 font-bold text-sm transition-colors relative",
+                    activeTab === 'discover' ? "text-slate-900" : "text-slate-400"
+                  )}
+                >
+                  Discover
+                  {activeTab === 'discover' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand" />}
                 </button>
               </div>
-            )}
-          </div>
-
-          {/* Tabs */}
-          <div className="flex border-b border-slate-100">
-            <button 
-              onClick={() => setActiveTab('overview')}
-              className={cn(
-                "flex-1 py-3 font-bold text-sm transition-colors relative",
-                activeTab === 'overview' ? "text-slate-900" : "text-slate-400"
-              )}
-            >
-              Overview
-              {activeTab === 'overview' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand" />}
-            </button>
-            <button 
-              onClick={() => setActiveTab('itinerary')}
-              className={cn(
-                "flex-1 py-3 font-bold text-sm transition-colors relative",
-                activeTab === 'itinerary' ? "text-slate-900" : "text-slate-400"
-              )}
-            >
-              Itinerary
-              {activeTab === 'itinerary' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand" />}
-            </button>
-            <button 
-              onClick={() => setActiveTab('discover')}
-              className={cn(
-                "flex-1 py-3 font-bold text-sm transition-colors relative",
-                activeTab === 'discover' ? "text-slate-900" : "text-slate-400"
-              )}
-            >
-              Discover
-              {activeTab === 'discover' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand" />}
-            </button>
           </div>
         </div>
 
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar px-6 pb-8 scroll-smooth">
+        <div ref={scrollContainerRef} onScroll={handleScroll} className={cn("flex-1 overflow-y-auto no-scrollbar px-6 pb-8 scroll-smooth transition-opacity duration-300", isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none")}>
           <AnimatePresence mode="wait">
             {activeTab === 'overview' ? (
               <motion.div 
@@ -632,74 +762,91 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                 </div>
 
                 {currentTrip.itinerary.map((day, i) => (
-                  <div key={i} id={`day-${day.day}`} className="space-y-4 pt-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xl font-bold text-slate-800">Day {day.day}</h3>
+                  <motion.div 
+                    key={i} 
+                    id={`day-${day.day}`} 
+                    className="space-y-4 pt-4"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                  >
+                    <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl">
+                      <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <span className="text-brand">Day {day.day}</span>
+                      </h3>
                       <button 
                         onClick={handleOptimize}
-                        className="text-brand text-xs font-bold flex items-center gap-1 bg-brand/5 px-3 py-1.5 rounded-full"
+                        className="text-brand text-xs font-bold flex items-center gap-1 bg-brand/10 px-3 py-1.5 rounded-full hover:bg-brand/20 transition-colors"
                       >
                         <Zap size={14} />
                         Optimize
                       </button>
                     </div>
+
                     <div className="space-y-4">
-                      {day.spots.map((spot, j) => (
-                        <motion.div 
-                          key={j}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => handleSpotClick(spot)}
-                          className="flex items-center gap-4 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition-all"
-                        >
-                          <div className="text-slate-400 font-bold text-lg w-6 text-right">{j + 1}.</div>
-                          <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0">
-                            <img src={spot.imageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1">
-                              <Sparkles size={16} className="text-cyan-400 fill-cyan-400" />
-                              <div className="font-bold text-slate-800 truncate text-lg">{spot.name}</div>
+                      <AnimatePresence>
+                        {day.spots.map((spot, j) => (
+                          <motion.div 
+                            key={`${spot.id}-${j}`}
+                            layout
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleSpotClick(spot)}
+                            className="flex items-center gap-4 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition-all"
+                          >
+                            <div className="text-slate-300 font-bold text-lg w-6 text-right">{j + 1}.</div>
+                            <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 shadow-inner">
+                              <img src={spot.imageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             </div>
-                            <div className="mt-2 inline-flex items-center gap-1.5 bg-slate-50 px-3 py-1 rounded-xl border border-slate-100">
-                              {getCategoryIcon(spot.category)}
-                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{spot.category}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1">
+                                <Sparkles size={16} className="text-cyan-400 fill-cyan-400" />
+                                <div className="font-bold text-slate-800 truncate text-lg">{spot.name}</div>
+                              </div>
+                              <div className="mt-2 inline-flex items-center gap-1.5 bg-slate-50 px-3 py-1 rounded-xl border border-slate-100">
+                                {getCategoryIcon(spot.category)}
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{spot.category}</span>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            {isEditing && (
+                            <div className="flex flex-col gap-2">
+                              {isEditing && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newItinerary = [...currentTrip.itinerary];
+                                    newItinerary[i].spots = newItinerary[i].spots.filter((_, spotIdx) => spotIdx !== j);
+                                    setCurrentTrip({ ...currentTrip, itinerary: newItinerary });
+                                  }}
+                                  className="p-2 bg-red-50 rounded-xl text-red-500 hover:bg-red-100 transition-colors"
+                                >
+                                  <X size={16} />
+                                </button>
+                              )}
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const newItinerary = [...currentTrip.itinerary];
-                                  newItinerary[i].spots = newItinerary[i].spots.filter((_, spotIdx) => spotIdx !== j);
-                                  setCurrentTrip({ ...currentTrip, itinerary: newItinerary });
+                                  openDirections(spot);
                                 }}
-                                className="p-2 bg-red-50 rounded-xl text-red-500 hover:bg-red-100 transition-colors"
+                                className="p-2 bg-slate-50 rounded-xl text-brand hover:bg-brand/10 transition-colors"
                               >
-                                <X size={16} />
+                                <Navigation size={18} />
                               </button>
-                            )}
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDirections(spot);
-                              }}
-                              className="p-2 bg-slate-50 rounded-xl text-brand"
-                            >
-                              <Navigation size={18} />
-                            </button>
-                          </div>
-                        </motion.div>
-                      ))}
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
                       <button 
                         onClick={handleAddPlace}
-                        className="w-full py-4 rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center gap-2 text-slate-400 text-xs font-bold hover:bg-slate-50 transition-colors"
+                        className="w-full py-4 rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center gap-2 text-slate-400 text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition-all"
                       >
                         <Plus size={16} />
                         Add a place
                       </button>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
                 
                 <div className="pt-8 pb-4 flex justify-center">
@@ -721,7 +868,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-8"
               >
-                <div className="bg-brand/5 rounded-3xl p-6 border border-brand/10">
+                <div className="bg-brand/5 rounded-3xl p-6 border border-brand/10 mb-6">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-brand rounded-full flex items-center justify-center text-white">
                       <Sparkles size={20} />
@@ -731,6 +878,50 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                       <p className="text-sm text-slate-500">AI-curated insights and recommendations</p>
                     </div>
                   </div>
+
+                  <div className="bg-white rounded-2xl p-4 border border-brand/10 shadow-sm mb-6">
+                    <h4 className="font-bold text-sm text-slate-900 mb-3">Analyze Social Media Video</h4>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text"
+                        placeholder="Paste Instagram/TikTok link here..."
+                        className="flex-1 bg-slate-50 border-none rounded-xl p-3 focus:ring-2 focus:ring-brand outline-none text-sm"
+                        value={socialLink}
+                        onChange={(e) => setSocialLink(e.target.value)}
+                      />
+                      <button 
+                        onClick={handleAnalyzeLink}
+                        disabled={isAnalyzingLink || !socialLink}
+                        className="bg-brand text-white px-4 py-2 rounded-xl font-bold hover:bg-brand-dark transition-colors text-sm disabled:opacity-50"
+                      >
+                        {isAnalyzingLink ? 'Analyzing...' : 'Analyze'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-2">Note: Due to platform restrictions, direct video analysis might be limited. Please ensure the link is public.</p>
+                  </div>
+                  
+                  {discoveredPlaces.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="font-bold text-sm text-slate-900 mb-3">Discovered Spots</h4>
+                      <div className="space-y-3">
+                        {discoveredPlaces.map((spot) => (
+                          <div key={spot.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-4">
+                            <img src={spot.imageUrl} alt={spot.name} className="w-16 h-16 rounded-xl object-cover" referrerPolicy="no-referrer" />
+                            <div className="flex-1">
+                              <h5 className="font-bold text-sm text-slate-900">{spot.name}</h5>
+                              <p className="text-xs text-slate-500 line-clamp-2">{spot.description}</p>
+                            </div>
+                            <button 
+                              onClick={() => handleAddSpot(spot)}
+                              className="bg-brand text-white p-2 rounded-xl hover:bg-brand-dark transition-colors"
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   
                   {isGettingDiscoverInfo ? (
                     <div className="space-y-6">
@@ -765,7 +956,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
             )}
           </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
 
       {/* Spot Detail Modal */}
       <AnimatePresence>
@@ -800,6 +991,41 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                     {selectedSpot.category}
                   </div>
                 </div>
+
+                {/* Opening Hours & Reviews */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  {spotDetails.openingHours && (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-2 text-slate-500 mb-1">
+                        <Clock size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Hours</span>
+                      </div>
+                      <div className="text-xs font-medium text-slate-800">{spotDetails.openingHours}</div>
+                    </div>
+                  )}
+                  {spotDetails.reviewSnippets && spotDetails.reviewSnippets.length > 0 && (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-2 text-slate-500 mb-1">
+                        <Star size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Top Review</span>
+                      </div>
+                      <div className="text-xs font-medium text-slate-800 line-clamp-2 italic">"{spotDetails.reviewSnippets[0]}"</div>
+                    </div>
+                  )}
+                </div>
+
+                {currentTrip && !currentTrip.spots.some(s => s.id === selectedSpot.id) && (
+                  <button
+                    onClick={() => {
+                      handleAddNearbySpot(selectedSpot);
+                      setSelectedSpot(null);
+                    }}
+                    className="w-full mb-6 py-3 bg-brand text-white font-bold rounded-xl hover:bg-brand/90 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
+                  >
+                    <Plus size={18} />
+                    Add to Day {activeDay}
+                  </button>
+                )}
 
                 <div className="space-y-6">
                   {/* Fast AI Info Section */}
@@ -945,7 +1171,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                         <h3 className="text-lg font-bold text-slate-800">Nearby Places</h3>
                         {isGettingNearby && <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />}
                       </div>
-                      <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-8 px-8">
+                      <div className="flex gap-4 overflow-x-auto custom-scrollbar -mx-8 px-8">
                         {isGettingNearby ? (
                           [1, 2, 3].map(i => (
                             <div key={i} className="flex-shrink-0 w-48 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-pulse">
@@ -961,18 +1187,22 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                           nearbySpots.map((spot) => (
                             <div 
                               key={spot.id}
-                              className="flex-shrink-0 w-48 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"
+                              onClick={() => handleSpotClick(spot)}
+                              className="flex-shrink-0 w-48 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                             >
                               <img src={spot.imageUrl} className="w-full h-24 object-cover" referrerPolicy="no-referrer" />
                               <div className="p-3">
                                 <div className="font-bold text-sm text-slate-800 truncate">{spot.name}</div>
                                 <div className="text-[10px] text-slate-400 font-medium uppercase mt-0.5">{spot.category}</div>
                                 <button 
-                                  onClick={() => handleAddNearbySpot(spot)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddNearbySpot(spot);
+                                  }}
                                   className="mt-3 w-full py-1.5 bg-slate-50 text-brand text-[10px] font-bold rounded-lg hover:bg-brand hover:text-white transition-colors flex items-center justify-center gap-1"
                                 >
                                   <Plus size={10} />
-                                  Add to Trip
+                                  Add to Day {activeDay}
                                 </button>
                               </div>
                             </div>
