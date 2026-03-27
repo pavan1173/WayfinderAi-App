@@ -35,9 +35,34 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
   const [isGettingDiscoverInfo, setIsGettingDiscoverInfo] = useState(false);
   const [socialLink, setSocialLink] = useState('');
   const [isAnalyzingLink, setIsAnalyzingLink] = useState(false);
+  const [showOptimizeConfirm, setShowOptimizeConfirm] = useState(false);
   const [discoveredPlaces, setDiscoveredPlaces] = useState<Spot[]>([]);
   const [promptModal, setPromptModal] = useState<{ isOpen: boolean, title: string, onSubmit: (val: string) => void, onCancel: () => void }>({ isOpen: false, title: '', onSubmit: () => {}, onCancel: () => {} });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const executeOptimization = async () => {
+    setShowOptimizeConfirm(false);
+    if (!currentTrip) return;
+    setIsReading(true);
+    try {
+      const { itinerary: optimizedItinerary, budget, hotels } = await geminiService.planItinerary(currentTrip.destination, currentTrip.duration, currentTrip.spots);
+      const updatedTrip = {
+        ...currentTrip,
+        itinerary: optimizedItinerary,
+        budget: budget || currentTrip.budget,
+        hotels: hotels || currentTrip.hotels
+      };
+      setCurrentTrip(updatedTrip);
+      if (trips.find(t => t.id === currentTrip.id)) {
+        addTrip(updatedTrip);
+      }
+      showToast('Itinerary optimized for travel time!');
+    } catch (error) {
+      console.error("Error optimizing:", error);
+      showToast("Failed to optimize itinerary.");
+    }
+    setIsReading(false);
+  };
 
   React.useEffect(() => {
     if (currentTrip) {
@@ -90,9 +115,8 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     }
   }, [activeTab, discoverInfo, isGettingDiscoverInfo, currentTrip]);
 
-  const handleToggleEdit = () => {
-    if (isEditing && currentTrip) {
-      // Save changes
+  const handleSave = () => {
+    if (currentTrip) {
       const updatedTrip = {
         ...currentTrip,
         destination: editedDestination,
@@ -100,12 +124,25 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
         duration: editedDuration
       };
       setCurrentTrip(updatedTrip);
-      // If it's already in the saved trips, update it there too
       if (trips.find(t => t.id === currentTrip.id)) {
-        addTrip(updatedTrip); // addTrip handles updates if ID matches (though current implementation might need check)
+        addTrip(updatedTrip);
       }
+      setIsEditing(false);
+      showToast("Trip details updated!");
     }
-    setIsEditing(!isEditing);
+  };
+
+  const handleCancel = () => {
+    if (currentTrip) {
+      setEditedDestination(currentTrip.destination);
+      setEditedDates(currentTrip.dates || '');
+      setEditedDuration(currentTrip.duration);
+    }
+    setIsEditing(false);
+  };
+
+  const handleToggleEdit = () => {
+    setIsEditing(true);
   };
 
   const handleSaveTrip = () => {
@@ -425,27 +462,8 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     });
   };
 
-  const handleOptimize = async () => {
-    if (!currentTrip) return;
-    setIsReading(true);
-    try {
-      const { itinerary: optimizedItinerary, budget, hotels } = await geminiService.planItinerary(currentTrip.destination, currentTrip.duration, currentTrip.spots);
-      const updatedTrip = {
-        ...currentTrip,
-        itinerary: optimizedItinerary,
-        budget: budget || currentTrip.budget,
-        hotels: hotels || currentTrip.hotels
-      };
-      setCurrentTrip(updatedTrip);
-      if (trips.find(t => t.id === currentTrip.id)) {
-        addTrip(updatedTrip);
-      }
-      showToast('Itinerary optimized for travel time!');
-    } catch (error) {
-      console.error("Error optimizing:", error);
-      showToast("Failed to optimize itinerary.");
-    }
-    setIsReading(false);
+  const handleOptimize = () => {
+    setShowOptimizeConfirm(true);
   };
 
   const handleAnalyzeLink = async () => {
@@ -491,7 +509,10 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
       className="fixed inset-0 bg-white z-40 flex flex-col md:flex-row"
     >
       {/* Map Area */}
-      <div className="relative h-[35vh] md:h-screen md:w-1/2 lg:w-3/5 bg-slate-200 overflow-hidden order-1 md:order-2">
+      <div className={cn(
+        "relative h-[35vh] md:h-screen bg-slate-200 overflow-hidden order-1 md:order-2 transition-all duration-300",
+        isSidebarOpen ? "md:w-1/2 lg:w-3/5" : "md:w-[calc(100%-4rem)] lg:w-[calc(100%-4rem)]"
+      )}>
         <MapView 
           spots={currentTrip.spots} 
           activeSpot={selectedSpot} 
@@ -501,6 +522,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
           currentDay={activeDay}
           onSpotClick={handleSpotClick}
           onAddNearbySpot={handleAddNearbySpot}
+          isSidebarOpen={isSidebarOpen}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-transparent pointer-events-none" />
         <div className="absolute top-12 left-6 right-6 flex items-center justify-between z-[1000]">
@@ -508,16 +530,23 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
             <ChevronLeft size={24} />
           </button>
           <div className="flex gap-2">
-            <button 
-              onClick={handleToggleEdit}
-              className={cn(
-                "px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm transition-colors",
-                isEditing ? "bg-brand text-white" : "bg-white text-slate-900"
-              )}
-            >
-              {isEditing ? <Check size={16} /> : <Edit2 size={16} />}
-              {isEditing ? 'Save' : 'Edit'}
-            </button>
+            {isEditing ? (
+              <>
+                <button onClick={handleSave} className="px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm bg-brand text-white">
+                  <Check size={16} /> Save
+                </button>
+                <button onClick={handleCancel} className="px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm bg-white text-slate-900">
+                  <X size={16} /> Cancel
+                </button>
+              </>
+            ) : (
+              <button 
+                onClick={handleToggleEdit}
+                className="px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm bg-white text-slate-900"
+              >
+                <Edit2 size={16} /> Edit
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -766,9 +795,10 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                     key={i} 
                     id={`day-${day.day}`} 
                     className="space-y-4 pt-4"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
+                    initial={{ opacity: 0, y: 50 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.2 }}
+                    transition={{ duration: 0.5, delay: i * 0.1 }}
                   >
                     <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl">
                       <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -789,13 +819,15 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                           <motion.div 
                             key={`${spot.id}-${j}`}
                             layout
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                            viewport={{ once: true, amount: 0.3 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            whileHover={{ scale: 1.01 }}
+                            whileHover={{ scale: 1.02, rotateY: 2, z: 10 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => handleSpotClick(spot)}
-                            className="flex items-center gap-4 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition-all"
+                            className="flex items-center gap-4 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-xl transition-all duration-300"
+                            style={{ perspective: "1000px" }}
                           >
                             <div className="text-slate-300 font-bold text-lg w-6 text-right">{j + 1}.</div>
                             <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 shadow-inner">
@@ -850,13 +882,15 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                 ))}
                 
                 <div className="pt-8 pb-4 flex justify-center">
-                  <button 
+                  <motion.button 
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={onClose}
-                    className="bg-white px-10 py-4 rounded-full shadow-xl border border-slate-100 font-bold text-slate-800 flex items-center gap-2 hover:scale-105 transition-transform"
+                    className="bg-white px-10 py-4 rounded-full shadow-xl border border-slate-100 font-bold text-slate-800 flex items-center gap-2"
                   >
                     <div className="w-4 h-4 bg-black rounded-sm" />
                     Cancel
-                  </button>
+                  </motion.button>
                 </div>
               </motion.div>
             )}
@@ -905,7 +939,12 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                       <h4 className="font-bold text-sm text-slate-900 mb-3">Discovered Spots</h4>
                       <div className="space-y-3">
                         {discoveredPlaces.map((spot) => (
-                          <div key={spot.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-4">
+                          <motion.div 
+                            key={spot.id} 
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-4"
+                          >
                             <img src={spot.imageUrl} alt={spot.name} className="w-16 h-16 rounded-xl object-cover" referrerPolicy="no-referrer" />
                             <div className="flex-1">
                               <h5 className="font-bold text-sm text-slate-900">{spot.name}</h5>
@@ -917,7 +956,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                             >
                               <Plus size={16} />
                             </button>
-                          </div>
+                          </motion.div>
                         ))}
                       </div>
                     </div>
@@ -1347,6 +1386,27 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Optimize Confirmation Modal */}
+      <AnimatePresence>
+        {showOptimizeConfirm && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full"
+            >
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Optimize Itinerary?</h3>
+              <p className="text-slate-600 mb-6">This will reorder your daily spots for better travel time and proximity. This action cannot be undone.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowOptimizeConfirm(false)} className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-bold">Cancel</button>
+                <button onClick={executeOptimization} className="flex-1 bg-brand text-white py-3 rounded-xl font-bold">Optimize</button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </motion.div>

@@ -5,6 +5,7 @@ import { auth, db } from '../../firebase';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { useApp } from '../../store/AppContext';
 import { useToast } from '../../store/ToastContext';
+import { ReelsFeed } from '../ReelsFeed';
 import { MapPin, Calendar, Plus, Compass, Heart, User, ChevronRight, Sparkles, X, Trash2, Mail, MessageCircle, Star as StarIcon, Share, Shield, FileText as FileIcon, LogOut, Instagram, Video, Info, Pencil, Bookmark } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { geminiService } from '../../services/geminiService';
@@ -25,6 +26,7 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   const [savedSpotDetails, setSavedSpotDetails] = useState<{ shortDescription: string, keywords: string[], newThings: string, upcomingEvents: string } | null>(null);
   const [isGettingSpotDetails, setIsGettingSpotDetails] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isReelsOpen, setIsReelsOpen] = useState(false);
   const [editName, setEditName] = useState(user?.name || 'DURGA VENKATA PRASAD CHITIKINA');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [tripToDelete, setTripToDelete] = useState<string | null>(null);
@@ -332,7 +334,7 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                   {showAllGuides ? "View less" : "View all"}
                 </button>
               </div>
-              <div className={cn("gap-4 pb-4", showAllGuides ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "flex overflow-x-auto custom-scrollbar -mx-6 px-6")}>
+              <div className={cn("gap-4 pb-4", showAllGuides ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "flex overflow-x-auto custom-scrollbar -mx-6 px-6")}>
                 {guides.map(guide => (
                   <motion.div 
                     key={guide.id}
@@ -353,6 +355,25 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                   </motion.div>
                 ))}
               </div>
+            </section>
+
+            {/* Reels Feed */}
+            <section className="mt-8">
+              <button 
+                onClick={() => setIsReelsOpen(true)}
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-3xl flex items-center justify-between shadow-xl shadow-pink-200"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
+                    <Video className="text-white" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold">Travel Reels</div>
+                    <div className="text-xs text-white/80">Explore destinations via reels</div>
+                  </div>
+                </div>
+                <ChevronRight size={20} className="text-white/60" />
+              </button>
             </section>
 
             {/* Nearby Places */}
@@ -402,7 +423,13 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
             </section>
 
               {/* My Trips */}
-              <section className="mt-8">
+              <motion.section 
+                className="mt-8"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.5 }}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-slate-800">My Trips</h2>
                   {trips.length > 3 && (
@@ -462,10 +489,16 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                   </button>
                 </div>
               )}
-            </section>
+            </motion.section>
 
             {/* Search History */}
-            <section className="mt-8">
+            <motion.section 
+              className="mt-8"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.5 }}
+            >
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-slate-800">Search History</h2>
               </div>
@@ -484,7 +517,7 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
               ) : (
                 <div className="text-slate-400 text-sm italic">No recent searches.</div>
               )}
-            </section>
+            </motion.section>
             </motion.div>
           )}
 
@@ -972,6 +1005,35 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
           </div>
         )}
       </AnimatePresence>
+      {isReelsOpen && (
+        <ReelsFeed 
+          posts={[
+            {
+              id: '1',
+              platform: 'instagram',
+              author: 'travel_guru',
+              image: 'https://picsum.photos/seed/travel1/600/800',
+              caption: 'Exploring the hidden gems of Bali! 🌴✨',
+              likes: '12.4K',
+              location: 'Bali, Indonesia',
+              comments: '342',
+              isLiked: false
+            },
+            {
+              id: '2',
+              platform: 'instagram',
+              author: 'wanderlust_life',
+              image: 'https://picsum.photos/seed/travel2/600/800',
+              caption: 'Sunset views in Santorini are unmatched. 🌅',
+              likes: '45.1K',
+              location: 'Santorini, Greece',
+              comments: '1.2K',
+              isLiked: true
+            }
+          ]}
+          onClose={() => setIsReelsOpen(false)}
+        />
+      )}
     </div>
   );
 };

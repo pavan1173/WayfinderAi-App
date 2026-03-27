@@ -80,20 +80,30 @@ export async function getWikipediaImage(query: string): Promise<string> {
   
   const cleanQuery = query.replace(/best|top|places to visit in|things to do in|itinerary|for two days|for \d+ days|in \w+|guide|travel|trip/gi, '').trim() || query;
   
-  try {
-    // First try Wikipedia search
-    const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(cleanQuery)}&gsrlimit=1&prop=pageimages&format=json&pithumbsize=600&origin=*`);
-    const data = await res.json();
-    const pages = data?.query?.pages;
-    if (pages) {
-      const pageId = Object.keys(pages)[0];
-      if (pageId !== '-1' && pages[pageId].thumbnail) {
-        return pages[pageId].thumbnail.source;
+  async function fetchWikiImage(q: string): Promise<string | null> {
+    try {
+      const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=1&prop=pageimages&format=json&pithumbsize=600&origin=*`);
+      const data = await res.json();
+      const pages = data?.query?.pages;
+      if (pages) {
+        const pageId = Object.keys(pages)[0];
+        if (pageId !== '-1' && pages[pageId].thumbnail) {
+          return pages[pageId].thumbnail.source;
+        }
       }
+    } catch (e) {
+      console.error("Wikipedia image fetch failed for", q, e);
     }
-  } catch (e) {
-    console.error("Wikipedia image fetch failed", e);
+    return null;
   }
+
+  // Try initial query
+  let image = await fetchWikiImage(cleanQuery);
+  if (image) return image;
+
+  // Try broader query
+  image = await fetchWikiImage(`${cleanQuery} landmark`);
+  if (image) return image;
   
   // Fallback to loremflickr with the query
   const keywords = cleanQuery.split(' ').join(',');
@@ -105,8 +115,9 @@ export const geminiService = {
     try {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Extract real travel spots from the following text or link description. For each spot, provide a name, a brief description, a category (e.g., Attraction, Restaurant, Cafe, Shopping, Nature), and approximate latitude and longitude coordinates. Use Google Search to verify these places exist and get accurate data. Text: ${text}`,
+        contents: `Extract travel spots from: "${text}". Provide: name, description, category, lat, lng.`,
         config: {
+          tools: [{ googleSearch: {} }],
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.ARRAY,
@@ -143,7 +154,7 @@ export const geminiService = {
     try {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `Find detailed Google Maps information for the travel spot: "${spotName}". Please include the official website URL, phone number, and exact latitude and longitude coordinates.`,
+        contents: `Find Maps info for: "${spotName}". Include website, phone, opening hours, lat, lng.`,
         config: {
           tools: [{ googleMaps: {} }],
           toolConfig: {
@@ -163,7 +174,7 @@ export const geminiService = {
 
       const structuredResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Extract the website URL, phone number, opening hours, latitude, and longitude from the following text. Text: ${infoText}`,
+        contents: `Extract from text: website, phone, hours, lat, lng. Text: ${infoText}`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -352,7 +363,7 @@ export const geminiService = {
                 data: videoData
               }
             },
-            { text: "Analyze this Instagram Reel/Video. Identify all travel destinations, landmarks, or spots mentioned or shown. For each spot, provide a name, a vivid description of what makes it special, a category, and approximate latitude/longitude coordinates. Return the data as a JSON array of objects." }
+            { text: "Analyze this Instagram Reel/Video. Identify all travel destinations, landmarks, or spots mentioned or shown. For each spot, provide a name, a vivid description of what makes it special, a category, and approximate latitude/longitude coordinates. CRITICAL: Verify the location name and ensure it is a real, specific, and accurate place. If you are unsure about a place, do not include it. Return the data as a JSON array of objects." }
           ]
         },
         config: {
@@ -400,6 +411,50 @@ export const geminiService = {
     }
   },
 
+  async getSpotRichDetails(spotName: string, location?: { lat: number, lng: number }): Promise<{ openingHours: string, reviews: string[], insights: string }> {
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Find detailed Google Maps information for the travel spot: "${spotName}". Please include opening hours, recent reviews, and any unique AI-generated insights about what makes it special.`,
+        config: {
+          tools: [{ googleMaps: {} }],
+          toolConfig: {
+            retrievalConfig: {
+              latLng: location ? { latitude: location.lat, longitude: location.lng } : undefined
+            }
+          }
+        },
+      });
+
+      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      const reviewSnippets = groundingChunks?.filter(c => c.maps?.placeAnswerSources?.reviewSnippets)
+        .flatMap(c => c.maps?.placeAnswerSources?.reviewSnippets?.map((s: any) => s.text || s) || []);
+
+      const infoText = response.text;
+
+      const structuredResponse = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Extract opening hours, reviews, and unique insights from the following text. Text: ${infoText}`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              openingHours: { type: Type.STRING },
+              reviews: { type: Type.ARRAY, items: { type: Type.STRING } },
+              insights: { type: Type.STRING },
+            },
+            required: ["openingHours", "reviews", "insights"]
+          }
+        }
+      });
+
+      return JSON.parse(structuredResponse.text);
+    } catch (e) {
+      return handleGeminiError(e, { openingHours: "Not available", reviews: [], insights: "No insights available." }, "getting spot rich details");
+    }
+  },
+
   async getDiscoverInfo(destination: string): Promise<string> {
     try {
       const response = await ai.models.generateContent({
@@ -433,6 +488,7 @@ export const geminiService = {
         contents: `Create a ${duration}-day trip itinerary using ALL of the following saved spots: ${spotsJson}. You MUST include every single spot provided in the itinerary.
         The user preferences are: ${preferences.join(', ')}.
         Suggest the best order for visiting these locations based on proximity and user preferences.
+        CRITICAL: Verify the location name and ensure it is a real, specific, and accurate place. If you are unsure about a place, do not include it.
         Also provide an estimated budget (e.g., "$1500" or "Moderate") and recommend 3 nearby hotels with their name, rating, pricePerNight, description, and an image search keyword.
         Return a JSON object representing the trip.`,
         config: {
@@ -532,7 +588,9 @@ export const geminiService = {
     try {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Plan a ${days}-day itinerary for ${destination} using ALL of these spots (provided as ID: Name): ${spots.map(s => `${s.id}: ${s.name}`).join(", ")}. You MUST include every single spot provided in the itinerary. Group them logically by day to minimize travel time. Also provide an estimated budget (e.g., "$1500" or "Moderate") and recommend 3 nearby hotels with their name, rating, pricePerNight, description, and an image search keyword. Return the spot IDs for each day.`,
+        contents: `Plan a ${days}-day itinerary for ${destination} using ALL of these spots (provided as ID: Name): ${spots.map(s => `${s.id}: ${s.name}`).join(", ")}. You MUST include every single spot provided in the itinerary. Group them logically by day to minimize travel time.
+        CRITICAL: Verify the location name and ensure it is a real, specific, and accurate place. If you are unsure about a place, do not include it.
+        Also provide an estimated budget (e.g., "$1500" or "Moderate") and recommend 3 nearby hotels with their name, rating, pricePerNight, description, and an image search keyword. Return the spot IDs for each day.`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {

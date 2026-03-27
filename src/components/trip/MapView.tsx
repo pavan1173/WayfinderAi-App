@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Marker, useMap, Polyline, Circle, LayersControl, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Spot } from '../../services/geminiService';
-import { ArrowUp } from 'lucide-react';
+import { Spot, geminiService } from '../../services/geminiService';
+import { ArrowUp, X } from 'lucide-react';
 
 // Fix for default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -50,6 +51,7 @@ interface MapViewProps {
   currentDay?: number;
   onSpotClick?: (spot: Spot) => void;
   onAddNearbySpot?: (spot: Spot) => void;
+  isSidebarOpen?: boolean;
 }
 
 const MapController = ({ 
@@ -89,9 +91,40 @@ const MapController = ({
   return null;
 };
 
-export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalActiveSpot, showRoute, orderedSpots, nearbySpots = [], currentDay, onSpotClick, onAddNearbySpot }) => {
+const ResizeHandler = ({ isSidebarOpen }: { isSidebarOpen?: boolean }) => {
+  const map = useMap();
+  useEffect(() => {
+    // Trigger resize during the transition
+    const timeout = setTimeout(() => {
+      map.invalidateSize({ animate: true });
+    }, 300); // Wait for transition to finish
+    return () => clearTimeout(timeout);
+  }, [isSidebarOpen, map]);
+  return null;
+};
+
+export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalActiveSpot, showRoute, orderedSpots, nearbySpots = [], currentDay, onSpotClick, onAddNearbySpot, isSidebarOpen }) => {
   const [localActiveSpot, setLocalActiveSpot] = React.useState<Spot | null>(null);
+  const [spotDetails, setSpotDetails] = React.useState<{ openingHours: string, reviews: string[], insights: string } | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = React.useState(false);
   const activeSpot = externalActiveSpot || localActiveSpot;
+
+  const handleSpotClick = async (spot: Spot) => {
+    setLocalActiveSpot(spot);
+    if (onSpotClick) {
+      onSpotClick(spot);
+    }
+    setIsLoadingDetails(true);
+    setSpotDetails(null);
+    try {
+      const details = await geminiService.getSpotRichDetails(spot.name, { lat: spot.lat!, lng: spot.lng! });
+      setSpotDetails(details);
+    } catch (e) {
+      console.error("Failed to fetch spot details", e);
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
 
   const validSpots = spots.filter(s => s.lat !== undefined && s.lng !== undefined);
   
@@ -177,6 +210,7 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
         style={{ height: '100%', width: '100%', zIndex: 1 }}
         scrollWheelZoom={true}
       >
+        <ResizeHandler isSidebarOpen={isSidebarOpen} />
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Standard">
             <TileLayer
@@ -246,17 +280,11 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
                 icon={createNumberedIcon(index + 1, activeSpot?.id === spot.id ? '#F59E0B' : color, false, activeSpot?.id === spot.id)}
                 draggable={true}
                 eventHandlers={{
-                  click: () => {
-                    setLocalActiveSpot(spot);
-                    if (onSpotClick) {
-                      onSpotClick(spot);
-                    }
-                  },
+                  click: () => handleSpotClick(spot),
                   dragend: (e) => {
                     const marker = e.target;
                     const position = marker.getLatLng();
                     console.log('New position:', position);
-                    // Here we would need a callback to update the spot's coordinates
                   }
                 }}
                 zIndexOffset={activeSpot?.id === spot.id ? 1000 : 0}
@@ -281,12 +309,7 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
               icon={createNumberedIcon(0, '#F59E0B', true, activeSpot?.id === spot.id)}
               draggable={true}
               eventHandlers={{
-                click: () => {
-                  setLocalActiveSpot(spot);
-                  if (onSpotClick) {
-                    onSpotClick(spot);
-                  }
-                },
+                click: () => handleSpotClick(spot),
                 dragend: (e) => {
                   const marker = e.target;
                   const position = marker.getLatLng();
@@ -318,6 +341,51 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
 
         <MapController activeSpot={activeSpot} spots={validSpots} />
       </MapContainer>
+
+      {/* Detail Panel */}
+      <AnimatePresence>
+        {activeSpot && (
+          <motion.div 
+            initial={{ opacity: 0, x: 300 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 300 }}
+            className="absolute top-4 right-4 z-[1001] w-80 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200 p-6 max-h-[calc(100%-32px)] overflow-y-auto"
+          >
+            <button onClick={() => setLocalActiveSpot(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">{activeSpot.name}</h2>
+            <p className="text-sm text-slate-500 mb-4">{activeSpot.category}</p>
+            
+            {isLoadingDetails ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : spotDetails ? (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900">Opening Hours</h4>
+                  <p className="text-sm text-slate-600">{spotDetails.openingHours}</p>
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900">AI Insights</h4>
+                  <p className="text-sm text-slate-600">{spotDetails.insights}</p>
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900">Reviews</h4>
+                  <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
+                    {spotDetails.reviews.slice(0, 3).map((review, i) => (
+                      <li key={i} className="line-clamp-2">{review}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">Details not available.</p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
