@@ -43,10 +43,16 @@ export const ImportModal = ({ isOpen, onClose, onPlanManual }: { isOpen: boolean
   const handleExtractFromSocial = async () => {
     setStep('detecting');
     try {
-      const spots = await geminiService.extractSpotsFromText(`Extract travel spots from these social media posts about ${inputValue}. Posts: ${socialPosts.map(p => p.caption).join(' | ')}`);
-      setDetectedSpots(spots);
+      if (inputType === 'social' && (inputValue.includes('instagram.com') || inputValue.includes('tiktok.com'))) {
+        const spots = await geminiService.analyzeSocialLink(inputValue);
+        setDetectedSpots(spots);
+      } else {
+        const spots = await geminiService.extractSpotsFromText(`Extract travel spots from these social media posts about ${inputValue}. Posts: ${socialPosts.map(p => p.caption).join(' | ')}`);
+        setDetectedSpots(spots);
+      }
       setStep('results');
     } catch (e) {
+      showToast("Failed to analyze link.");
       setStep('options');
     }
   };

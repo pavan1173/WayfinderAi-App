@@ -3,6 +3,7 @@ import { Spot, Trip } from '../services/geminiService';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { Toast } from '../components/ui/Toast';
 
 interface AppContextType {
   onboarded: boolean;
@@ -23,6 +24,7 @@ interface AppContextType {
   searchHistory: string[];
   addSearch: (destination: string) => void;
   isAuthReady: boolean;
+  showToast: (message: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -37,6 +39,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [toast, setToast] = useState<{ message: string; isVisible: boolean }>({ message: '', isVisible: false });
+
+  useEffect(() => {
+    const handleShowToast = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+      setToast({ message: customEvent.detail, isVisible: true });
+    };
+    window.addEventListener('show-toast', handleShowToast);
+    return () => window.removeEventListener('show-toast', handleShowToast);
+  }, []);
+
+  const showToast = (message: string) => {
+    setToast({ message, isVisible: true });
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -129,9 +145,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{
       onboarded, user, trips, savedSpots, savedReels, importHistory, searchHistory, currentTrip,
-      setOnboarded, setUser, addTrip, deleteTrip, addSavedSpots, toggleSavedReel, addImportHistory, setCurrentTrip, addSearch, isAuthReady
+      setOnboarded, setUser, addTrip, deleteTrip, addSavedSpots, toggleSavedReel, addImportHistory, setCurrentTrip, addSearch, isAuthReady, showToast
     }}>
       {children}
+      <Toast 
+        message={toast.message} 
+        isVisible={toast.isVisible} 
+        onClose={() => setToast({ ...toast, isVisible: false })} 
+      />
     </AppContext.Provider>
   );
 };

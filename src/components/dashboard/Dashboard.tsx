@@ -10,11 +10,11 @@ import { MapPin, Calendar, Plus, Compass, Heart, User, ChevronRight, Sparkles, X
 import { cn } from '../../lib/utils';
 import { geminiService } from '../../services/geminiService';
 import ReactMarkdown from 'react-markdown';
-import { Spot } from '../../services/geminiService';
+import { Spot, Trip } from '../../services/geminiService';
 import { ImportHistoryModal } from '../import/ImportHistoryModal';
 
 export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, onPlanTrip: (destination?: string, spots?: Spot[], duration?: number) => void }) => {
-  const { trips, savedSpots, user, setCurrentTrip, deleteTrip, addSearch, searchHistory } = useApp();
+  const { trips, savedSpots, user, setCurrentTrip, deleteTrip, addTrip, addSearch, searchHistory } = useApp();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('home');
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -30,6 +30,8 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   const [editName, setEditName] = useState(user?.name || 'DURGA VENKATA PRASAD CHITIKINA');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [tripToDelete, setTripToDelete] = useState<string | null>(null);
+  const [editingTripId, setEditingTripId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<{destination: string, dates: string, duration: number} | null>(null);
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [showAllTrips, setShowAllTrips] = useState(false);
   const [showAllGuides, setShowAllGuides] = useState(false);
@@ -140,6 +142,23 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
       addSearch(destination);
     }
     onPlanTrip(destination, spots, duration);
+  };
+
+  const handleEditTrip = (trip: Trip) => {
+    setEditingTripId(trip.id);
+    setEditValues({ destination: trip.destination, dates: trip.dates || '', duration: trip.duration });
+  };
+
+  const handleSaveEdit = (trip: Trip) => {
+    if (!editValues) return;
+    addTrip({ ...trip, ...editValues });
+    setEditingTripId(null);
+    setEditValues(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTripId(null);
+    setEditValues(null);
   };
 
   const handleChat = async () => {
@@ -347,7 +366,12 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                     }}
                     className={cn("relative rounded-2xl overflow-hidden shadow-md cursor-pointer", showAllGuides ? "w-full aspect-[3/4]" : "flex-shrink-0 w-40 h-56")}
                   >
-                    <img src={guide.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img 
+                      src={guide.image} 
+                      className="w-full h-full object-cover" 
+                      referrerPolicy="no-referrer" 
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(guide.title)}/400/400`; }}
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent p-4 flex flex-col justify-end">
                       <div className="text-white font-bold text-sm leading-tight">{guide.title}</div>
                       <div className="text-white/70 text-[10px] mt-1">{guide.spots} Spots</div>
@@ -404,7 +428,12 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                       onClick={() => handleSavedSpotClick(spot)}
                       className="relative rounded-3xl overflow-hidden shadow-md group cursor-pointer flex-shrink-0 w-48 h-72"
                     >
-                      <img src={spot.imageUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" referrerPolicy="no-referrer" />
+                      <img 
+                        src={spot.imageUrl} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                        referrerPolicy="no-referrer" 
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(spot.name)}/400/400`; }}
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-4 flex flex-col justify-end">
                         <div className="text-white font-bold text-sm line-clamp-2 leading-tight">{spot.name}</div>
                         <div className="text-white/70 text-[10px] mt-1">{spot.category}</div>
@@ -447,32 +476,52 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                     {(showAllTrips ? trips : trips.slice(0, 3)).map(trip => (
                       <motion.div 
                         key={trip.id}
+                        whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => setCurrentTrip(trip)}
                         className="bg-slate-200 p-2 rounded-3xl flex items-center gap-3 cursor-pointer hover:bg-slate-300 transition-colors"
                       >
                       <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0">
-                        <img src={trip.spots?.[0]?.imageUrl || `https://loremflickr.com/600/400/${encodeURIComponent(trip.destination.split(' ').join(','))}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img 
+                        src={trip.spots?.[0]?.imageUrl || `https://loremflickr.com/600/400/${encodeURIComponent(trip.destination.split(' ').join(','))}`} 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer" 
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(trip.destination)}/600/400`; }}
+                      />
                       </div>
                       <div className="flex-1 bg-white rounded-2xl p-3 flex items-center justify-between">
-                        <div className="flex flex-col justify-center">
-                          <div className="font-bold text-slate-800 text-sm leading-tight">{trip.duration}-Day {trip.destination}<br/>Trip</div>
-                          <div className="text-xs text-slate-500 mt-0.5">{trip.spots.length} Spots</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTripToDelete(trip.id);
-                            }}
-                            className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                          <div className="w-6 h-6 rounded-full bg-slate-50 flex items-center justify-center">
-                            <ChevronRight size={14} className="text-slate-400" />
+                        {editingTripId === trip.id ? (
+                          <div className="flex flex-col gap-2 w-full">
+                            <input type="text" value={editValues?.destination} onChange={(e) => setEditValues(prev => prev ? {...prev, destination: e.target.value} : null)} className="border rounded p-1 text-sm" />
+                            <input type="text" value={editValues?.dates} onChange={(e) => setEditValues(prev => prev ? {...prev, dates: e.target.value} : null)} className="border rounded p-1 text-sm" />
+                            <input type="number" value={editValues?.duration} onChange={(e) => setEditValues(prev => prev ? {...prev, duration: parseInt(e.target.value)} : null)} className="border rounded p-1 text-sm" />
+                            <div className="flex gap-2">
+                              <button onClick={() => handleSaveEdit(trip)} className="bg-brand text-white px-2 py-1 rounded text-xs">Save</button>
+                              <button onClick={handleCancelEdit} className="bg-slate-200 px-2 py-1 rounded text-xs">Cancel</button>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <>
+                            <div className="flex flex-col justify-center" onClick={() => setCurrentTrip(trip)}>
+                              <div className="font-bold text-slate-800 text-sm leading-tight">{trip.duration}-Day {trip.destination}<br/>Trip</div>
+                              <div className="text-xs text-slate-500 mt-0.5">{trip.spots.length} Spots</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="p-1.5 text-slate-300 hover:text-brand transition-colors"><Pencil size={16} /></button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTripToDelete(trip.id);
+                                }}
+                                className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                              <div className="w-6 h-6 rounded-full bg-slate-50 flex items-center justify-center">
+                                <ChevronRight size={14} className="text-slate-400" />
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </motion.div>
                   ))}
@@ -505,13 +554,15 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
               {searchHistory.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {searchHistory.map((destination, index) => (
-                    <button 
+                    <motion.button 
                       key={index}
+                      whileHover={{ scale: 1.02, boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)" }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => handlePlanTrip(destination)}
                       className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-full text-sm font-medium transition-colors"
                     >
                       {destination}
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               ) : (

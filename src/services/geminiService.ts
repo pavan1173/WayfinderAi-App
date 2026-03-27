@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type, Modality, ThinkingLevel } from "@google/genai";
+import { showToast } from '../lib/toast';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -26,8 +27,10 @@ async function handleGeminiError<T>(error: any, fallback: T, context: string): P
 
   if (isRateLimit) {
     console.warn(`Gemini rate limit hit for ${context}, using fallback.`);
+    showToast("Rate limit exceeded. Please try again later.");
   } else {
     console.error(`Failed to load ${context}`, error);
+    showToast(`Failed to load ${context}. Please try again.`);
   }
   
   return fallback;

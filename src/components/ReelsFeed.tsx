@@ -17,55 +17,80 @@ interface Reel {
 }
 
 export const ReelsFeed = ({ posts, onClose }: { posts: Reel[], onClose: () => void }) => {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [isDoubleTapping, setIsDoubleTapping] = useState(false);
+  const lastTap = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const { savedReels, toggleSavedReel } = useApp();
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (containerRef.current) {
-        const index = Math.round(containerRef.current.scrollTop / containerRef.current.clientHeight);
-        setActiveIndex(index);
+  const handleTap = (post: Reel) => {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      // Double tap
+      if (!post.isLiked) {
+        // Toggle like logic here
+        setIsDoubleTapping(true);
+        setTimeout(() => setIsDoubleTapping(false), 1000);
       }
-    };
-    containerRef.current?.addEventListener('scroll', handleScroll);
-    return () => containerRef.current?.removeEventListener('scroll', handleScroll);
-  }, []);
+    }
+    lastTap.current = now;
+  };
 
   return (
     <div className="fixed inset-0 z-[10000] bg-black">
-      <button onClick={onClose} className="absolute top-6 left-6 z-10 text-white p-2 bg-black/50 rounded-full backdrop-blur-md">
+      <button onClick={onClose} className="absolute top-6 left-6 z-10 text-white p-2 bg-black/20 rounded-full backdrop-blur-md">
         <X size={24} />
       </button>
       <div ref={containerRef} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar">
         {posts.map((post) => (
-          <div key={post.id} className="h-full w-full snap-start relative">
-            <img src={post.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-6 flex flex-col justify-end">
-              <div className="flex items-center gap-2 mb-2 drop-shadow-md">
-                <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-white/20">
-                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author}`} alt="avatar" />
+          <div key={post.id} className="h-full w-full snap-start relative" onClick={() => handleTap(post)}>
+            <img 
+              src={post.image} 
+              className="w-full h-full object-cover" 
+              referrerPolicy="no-referrer" 
+              onError={(e) => { (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/travel/600/800'; }}
+            />
+            {isDoubleTapping && (
+              <motion.div 
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1.5, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                className="absolute inset-0 flex items-center justify-center"
+              >
+                <Heart size={100} className="text-red-500 fill-red-500" />
+              </motion.div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent p-6 flex flex-col justify-end">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden border-2 border-white/20">
+                  <img 
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author}`} 
+                    alt="avatar" 
+                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://api.dicebear.com/7.x/avataaars/svg?seed=fallback'; }}
+                  />
                 </div>
-                <div className="text-white font-bold text-shadow-sm">{post.author}</div>
+                <div className="text-white font-bold text-lg">{post.author}</div>
               </div>
-              <div className="text-white text-sm mb-4 line-clamp-3 drop-shadow-md">{post.caption}</div>
-              <div className="flex items-center gap-2 text-white/90 text-xs mb-6 drop-shadow-md font-medium">
-                <MapPin size={14} /> {post.location}
+              <div className="text-white text-sm mb-4 line-clamp-3">{post.caption}</div>
+              <div className="flex items-center gap-2 text-white/90 text-sm mb-8 font-medium">
+                <MapPin size={16} /> {post.location}
               </div>
-              <div className="absolute right-6 bottom-20 flex flex-col gap-6">
-                <button className="flex flex-col items-center gap-1 text-white">
-                  <Heart size={32} className={post.isLiked ? "fill-red-500 text-red-500" : ""} />
-                  <span className="text-xs font-medium">{post.likes}</span>
+              <div className="absolute right-6 bottom-24 flex flex-col gap-8">
+                <button className="flex flex-col items-center gap-1 text-white hover:scale-110 transition-transform">
+                  <Heart size={36} className={post.isLiked ? "fill-red-500 text-red-500" : ""} />
+                  <span className="text-sm font-medium">{post.likes}</span>
                 </button>
-                <button className="flex flex-col items-center gap-1 text-white">
-                  <MessageCircle size={32} />
-                  <span className="text-xs font-medium">{post.comments}</span>
+                <button className="flex flex-col items-center gap-1 text-white hover:scale-110 transition-transform">
+                  <MessageCircle size={36} />
+                  <span className="text-sm font-medium">{post.comments}</span>
                 </button>
                 <button 
                   onClick={() => toggleSavedReel(post.id)}
-                  className="flex flex-col items-center gap-1 text-white"
+                  className="flex flex-col items-center gap-1 text-white hover:scale-110 transition-transform"
                 >
-                  <Bookmark size={32} className={savedReels.includes(post.id) ? "fill-white text-white" : ""} />
+                  <Bookmark size={36} className={savedReels.includes(post.id) ? "fill-white text-white" : ""} />
+                </button>
+                <button className="flex flex-col items-center gap-1 text-white hover:scale-110 transition-transform">
+                  <Instagram size={36} />
                 </button>
               </div>
             </div>
