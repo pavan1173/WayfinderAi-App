@@ -190,6 +190,42 @@ export const Onboarding = () => {
           <DetectingAnimation />
         </div>
       )
+    },
+    {
+      title: "Master your travel planning",
+      subtitle: "Here's how to get the most out of Wayfinder",
+      content: (
+        <div className="mt-8 w-full px-6 space-y-4">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-left flex items-start gap-4"
+          >
+            <div className="bg-brand-light p-3 rounded-2xl">
+              <Instagram className="text-brand" />
+            </div>
+            <div>
+              <div className="font-bold">Import from Social</div>
+              <div className="text-sm text-slate-500">Paste any Instagram or TikTok link to extract spots instantly.</div>
+            </div>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-left flex items-start gap-4"
+          >
+            <div className="bg-brand-light p-3 rounded-2xl">
+              <MapPin className="text-brand" />
+            </div>
+            <div>
+              <div className="font-bold">Plan Your Trip</div>
+              <div className="text-sm text-slate-500">Click 'Plan Trip' to turn your saved spots into a perfect itinerary.</div>
+            </div>
+          </motion.div>
+        </div>
+      )
     }
   ];
 
@@ -200,6 +236,13 @@ export const Onboarding = () => {
       setOnboarded(true);
     }
   };
+
+  React.useEffect(() => {
+    if (step === 5) {
+      const timer = setTimeout(handleNext, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [step]);
 
   const current = steps[step];
 

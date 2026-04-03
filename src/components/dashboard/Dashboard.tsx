@@ -6,7 +6,7 @@ import { doc, deleteDoc } from 'firebase/firestore';
 import { useApp } from '../../store/AppContext';
 import { useToast } from '../../store/ToastContext';
 import { ReelsFeed } from '../ReelsFeed';
-import { MapPin, Calendar, Plus, Compass, Heart, User, ChevronRight, Sparkles, X, Trash2, Mail, MessageCircle, Star as StarIcon, Share, Shield, FileText as FileIcon, LogOut, Instagram, Video, Info, Pencil, Bookmark } from 'lucide-react';
+import { MapPin, Calendar, Plus, Compass, Heart, User, ChevronRight, Sparkles, X, Trash2, Mail, MessageCircle, Star as StarIcon, Share, Shield, FileText as FileIcon, LogOut, Instagram, Video, Info, Pencil, Bookmark, Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { geminiService } from '../../services/geminiService';
 import ReactMarkdown from 'react-markdown';
@@ -40,6 +40,21 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   const [isPlanningFromSaved, setIsPlanningFromSaved] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullY, setPullY] = useState(0);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const startY = React.useRef(0);
   const { setUser } = useApp();
@@ -130,11 +145,27 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
         showToast("Account deleted successfully");
         setShowDeleteAccountConfirm(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting account", error);
-      showToast("Error deleting account");
+      if (error.code === 'auth/user-token-expired') {
+        showToast("For security, please sign out and sign back in before deleting your account.");
+      } else {
+        showToast("Error deleting account");
+      }
       setShowDeleteAccountConfirm(false);
     }
+  };
+
+  const handleExportTrip = (trip: Trip) => {
+    const content = `Trip to ${trip.destination}\nDuration: ${trip.duration} days\n\nSpots:\n${trip.spots.map((s: Spot) => `- ${s.name}: ${s.description}`).join('\n')}`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${trip.destination}_itinerary.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Trip exported successfully");
   };
 
   const handlePlanTrip = (destination?: string, spots?: Spot[], duration?: number) => {
@@ -320,14 +351,15 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
             {activeTab === 'home' && (
               <motion.div 
                 key="home"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.2 }}
                 className="max-w-6xl mx-auto"
               >
             {/* Chat with Wayfinder Ai */}
-            <section className="mt-4">
+            <motion.section variants={itemVariants} className="mt-4">
               <button 
                 onClick={() => setIsChatOpen(true)}
                 className="w-full bg-slate-900 text-white p-6 rounded-3xl flex items-center justify-between shadow-xl shadow-slate-200"
@@ -343,10 +375,10 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                 </div>
                 <ChevronRight size={20} className="text-white/40" />
               </button>
-            </section>
+            </motion.section>
 
             {/* Travel Guides */}
-            <section className="mt-8">
+            <motion.section variants={itemVariants} className="mt-8">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-slate-800">Top 10 Places in India</h2>
                 <button onClick={() => setShowAllGuides(!showAllGuides)} className="text-brand text-sm font-semibold">
@@ -379,29 +411,10 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                   </motion.div>
                 ))}
               </div>
-            </section>
-
-            {/* Reels Feed */}
-            <section className="mt-8">
-              <button 
-                onClick={() => setIsReelsOpen(true)}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-3xl flex items-center justify-between shadow-xl shadow-pink-200"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
-                    <Video className="text-white" />
-                  </div>
-                  <div className="text-left">
-                    <div className="font-bold">Travel Reels</div>
-                    <div className="text-xs text-white/80">Explore destinations via reels</div>
-                  </div>
-                </div>
-                <ChevronRight size={20} className="text-white/60" />
-              </button>
-            </section>
+            </motion.section>
 
             {/* Nearby Places */}
-            <section className="mt-8">
+            <motion.section variants={itemVariants} className="mt-8">
               <div className="flex items-center justify-between mb-4">
                 <button 
                   onClick={handleNearbyClick}
@@ -449,15 +462,12 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                   )}
                 </div>
               )}
-            </section>
+            </motion.section>
 
               {/* My Trips */}
               <motion.section 
+                variants={itemVariants}
                 className="mt-8"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{ duration: 0.5 }}
               >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-slate-800">My Trips</h2>
@@ -476,9 +486,9 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                     {(showAllTrips ? trips : trips.slice(0, 3)).map(trip => (
                       <motion.div 
                         key={trip.id}
-                        whileHover={{ scale: 1.02 }}
+                        whileHover={{ scale: 1.02, backgroundColor: "#f1f5f9" }}
                         whileTap={{ scale: 0.98 }}
-                        className="bg-slate-200 p-2 rounded-3xl flex items-center gap-3 cursor-pointer hover:bg-slate-300 transition-colors"
+                        className="bg-white p-3 rounded-3xl flex items-center gap-3 cursor-pointer border border-slate-100 shadow-sm transition-colors"
                       >
                       <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0">
                         <img 
@@ -507,6 +517,15 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                             </div>
                             <div className="flex items-center gap-2">
                               <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="p-1.5 text-slate-300 hover:text-brand transition-colors"><Pencil size={16} /></button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleExportTrip(trip);
+                                }}
+                                className="p-1.5 text-slate-300 hover:text-brand transition-colors"
+                              >
+                                <Download size={16} />
+                              </button>
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -845,37 +864,48 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
       {/* Chat Modal */}
       <AnimatePresence>
         {isChatOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center bg-black/40 backdrop-blur-sm p-0 md:p-6">
-            <motion.div 
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              className="w-full max-w-lg bg-white rounded-t-[2.5rem] md:rounded-3xl p-6 pb-12 md:pb-6 shadow-2xl max-h-[80vh] flex flex-col"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-slate-800">Chat with Wayfinder Ai</h2>
-                <button onClick={() => setIsChatOpen(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                  <X size={24} />
-                </button>
-              </div>
+          <motion.div 
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed inset-y-0 right-0 z-[9999] w-full max-w-md bg-white shadow-2xl flex flex-col border-l border-slate-100"
+          >
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+              <h2 className="text-xl font-bold text-slate-800">Chat with Wayfinder Ai</h2>
+              <button onClick={() => setIsChatOpen(false)} className="p-2 hover:bg-slate-100 rounded-full">
+                <X size={24} />
+              </button>
+            </div>
 
-              <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 mb-6">
-                {chatResponse ? (
-                  <div className="bg-slate-50 p-4 rounded-2xl text-slate-700 leading-relaxed">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {chatQuery && (
+                <div className="flex justify-end">
+                  <div className="bg-brand text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] shadow-sm">
+                    {chatQuery}
+                  </div>
+                </div>
+              )}
+              {chatResponse ? (
+                <div className="flex justify-start">
+                  <div className="bg-slate-100 p-4 rounded-2xl rounded-tl-none text-slate-800 leading-relaxed max-w-[85%] shadow-sm">
                     <ReactMarkdown>{chatResponse}</ReactMarkdown>
                   </div>
-                ) : isThinking ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-4">
-                    <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin" />
-                    <div className="text-slate-500 font-medium italic">Wayfinder is thinking...</div>
+                </div>
+              ) : isThinking ? (
+                <div className="flex justify-start">
+                  <div className="bg-slate-100 p-4 rounded-2xl rounded-tl-none text-slate-500 font-medium italic">
+                    Wayfinder is thinking...
                   </div>
-                ) : (
-                  <div className="text-center py-12 text-slate-400">
-                    Ask me anything about your travels!
-                  </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-slate-400">
+                  Ask me anything about your travels!
+                </div>
+              )}
+            </div>
 
+            <div className="p-6 border-t border-slate-100">
               <div className="flex gap-2">
                 <input 
                   value={chatQuery}
@@ -892,8 +922,8 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                   <Sparkles size={24} />
                 </button>
               </div>
-            </motion.div>
-          </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
