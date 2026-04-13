@@ -16,24 +16,31 @@ L.Icon.Default.mergeOptions({
 });
 
 // Custom Numbered Icon Generator
-const createNumberedIcon = (number: number, color: string = '#3B82F6', isNearby: boolean = false, isActive: boolean = false) => {
+const createNumberedIcon = (number: number, color: string = '#3B82F6', isNearby: boolean = false, isActive: boolean = false, customIconUrl?: string) => {
+  if (customIconUrl) {
+    return L.icon({
+      iconUrl: customIconUrl,
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -32],
+    });
+  }
   return L.divIcon({
     className: `custom-numbered-marker ${isActive ? 'active-marker-pulse' : ''}`,
     html: `<div style="
       background-color: ${isNearby ? '#F59E0B' : color};
-      width: ${isNearby ? '28px' : (isActive ? '48px' : '36px')};
-      height: ${isNearby ? '28px' : (isActive ? '48px' : '36px')};
+      width: ${isActive ? '48px' : '36px'};
+      height: ${isActive ? '48px' : '36px'};
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
-      font-weight: bold;
-      font-size: ${isNearby ? '14px' : (isActive ? '18px' : '16px')};
-      border: ${isActive ? '3px' : '2px'} solid white;
-      box-shadow: 0 ${isActive ? '8px 16px' : '4px 6px'} rgba(0,0,0,0.${isActive ? '4' : '2'});
-      transition: all 0.3s ease;
-      transform-origin: center center;
+      font-weight: 800;
+      font-size: ${isActive ? '20px' : '16px'};
+      border: 3px solid white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     ">
       ${isNearby ? '★' : number}
     </div>`,
@@ -51,6 +58,8 @@ interface MapViewProps {
   currentDay?: number;
   onSpotClick?: (spot: Spot) => void;
   onAddNearbySpot?: (spot: Spot) => void;
+  onSpotDragEnd?: (spot: Spot, lat: number, lng: number) => void;
+  onUpdateSpot?: (spot: Spot) => void;
   isSidebarOpen?: boolean;
 }
 
@@ -103,7 +112,7 @@ const ResizeHandler = ({ isSidebarOpen }: { isSidebarOpen?: boolean }) => {
   return null;
 };
 
-export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalActiveSpot, showRoute, orderedSpots, nearbySpots = [], currentDay, onSpotClick, onAddNearbySpot, isSidebarOpen }) => {
+export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalActiveSpot, showRoute, orderedSpots, nearbySpots = [], currentDay, onSpotClick, onAddNearbySpot, onSpotDragEnd, onUpdateSpot, isSidebarOpen }) => {
   const [localActiveSpot, setLocalActiveSpot] = React.useState<Spot | null>(null);
   const [spotDetails, setSpotDetails] = React.useState<{ openingHours: string, reviews: string[], insights: string } | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = React.useState(false);
@@ -161,29 +170,27 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
             }
           }
           .active-marker-pulse {
-            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            animation: pulse-subtle 2s ease-in-out infinite;
             z-index: 1000 !important;
           }
-          @keyframes pulse-ring {
+          @keyframes pulse-subtle {
             0% {
-              transform: scale(0.95);
-              box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+              transform: scale(1);
             }
             50% {
-              transform: scale(1.05);
-              box-shadow: 0 0 0 10px rgba(245, 158, 11, 0.3);
+              transform: scale(1.1);
             }
             100% {
-              transform: scale(0.95);
-              box-shadow: 0 0 0 20px rgba(245, 158, 11, 0);
+              transform: scale(1);
             }
           }
           .custom-numbered-marker {
-            animation: markerDrop 0.5s cubic-bezier(0.25, 1.5, 0.5, 1) backwards;
+            animation: markerAppear 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards;
           }
-          @keyframes markerDrop {
-            0% { transform: translateY(-20px) scale(0.5); opacity: 0; }
-            100% { transform: translateY(0) scale(1); opacity: 1; }
+          @keyframes markerAppear {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
           }
           .leaflet-marker-icon {
             border: none;
@@ -277,14 +284,16 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
               <Marker 
                 key={`trip-spot-${spot.id}-${index}`} 
                 position={[spot.lat!, spot.lng!]}
-                icon={createNumberedIcon(index + 1, activeSpot?.id === spot.id ? '#F59E0B' : color, false, activeSpot?.id === spot.id)}
+                icon={createNumberedIcon(index + 1, activeSpot?.id === spot.id ? '#F59E0B' : color, false, activeSpot?.id === spot.id, spot.markerIcon)}
                 draggable={true}
                 eventHandlers={{
                   click: () => handleSpotClick(spot),
                   dragend: (e) => {
                     const marker = e.target;
                     const position = marker.getLatLng();
-                    console.log('New position:', position);
+                    if (onSpotDragEnd) {
+                      onSpotDragEnd(spot, position.lat, position.lng);
+                    }
                   }
                 }}
                 zIndexOffset={activeSpot?.id === spot.id ? 1000 : 0}
@@ -378,6 +387,23 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
                       <li key={i} className="line-clamp-2">{review}</li>
                     ))}
                   </ul>
+                </div>
+                {/* Custom Icon Section */}
+                <div className="mt-6 border-t pt-4">
+                  <h4 className="font-bold text-sm text-slate-900 mb-2">Marker Icon</h4>
+                  <div className="flex gap-2 mb-2">
+                    {['https://cdn-icons-png.flaticon.com/512/684/684908.png', 'https://cdn-icons-png.flaticon.com/512/684/684909.png'].map(iconUrl => (
+                      <button key={iconUrl} onClick={() => onUpdateSpot && onUpdateSpot({...activeSpot, markerIcon: iconUrl})} className="w-10 h-10 border rounded-lg overflow-hidden">
+                        <img src={iconUrl} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="Or paste icon URL" 
+                    className="w-full text-sm p-2 border rounded-lg"
+                    onChange={(e) => onUpdateSpot && onUpdateSpot({...activeSpot, markerIcon: e.target.value})}
+                  />
                 </div>
               </div>
             ) : (

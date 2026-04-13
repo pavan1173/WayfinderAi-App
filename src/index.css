@@ -9,13 +9,24 @@
   --color-brand: #3B82F6;
   --color-brand-light: #EFF6FF;
   --color-brand-dark: #1D4ED8;
+  
+  --radius-card: 24px;
+  --radius-button: 9999px;
 }
 
 @layer base {
   body {
-    @apply bg-white text-slate-900 antialiased;
+    @apply bg-slate-50 text-slate-900 antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "ss01";
   }
+}
+
+.card {
+  @apply bg-white rounded-[var(--radius-card)] shadow-sm border border-slate-100;
+}
+
+.btn-primary {
+  @apply bg-brand text-white rounded-[var(--radius-button)] px-6 py-3 font-semibold hover:bg-brand-dark transition-all;
 }
 
 .glass {

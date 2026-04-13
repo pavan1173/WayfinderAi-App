@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, MessageCircle, Bookmark, MapPin, Instagram, Video, X } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, MapPin, Instagram, Video, X, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useApp } from '../store/AppContext';
+import { geminiService } from '../services/geminiService';
+import { useToast } from '../store/ToastContext';
 
 interface Reel {
   id: string;
@@ -20,7 +22,26 @@ export const ReelsFeed = ({ posts, onClose }: { posts: Reel[], onClose: () => vo
   const [isDoubleTapping, setIsDoubleTapping] = useState(false);
   const lastTap = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { savedReels, toggleSavedReel } = useApp();
+  const { savedReels, toggleSavedReel, addSavedSpots } = useApp();
+  const { showToast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveLocation = async (location: string) => {
+    setIsSaving(true);
+    try {
+      const spots = await geminiService.extractSpotsFromText(location);
+      if (spots.length > 0) {
+        addSavedSpots(spots);
+        showToast(`Saved ${spots[0].name} to your spots!`);
+      } else {
+        showToast("Could not find a specific spot in this location.");
+      }
+    } catch (error) {
+      showToast("Failed to save location.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleTap = (post: Reel) => {
     const now = Date.now();
@@ -73,6 +94,13 @@ export const ReelsFeed = ({ posts, onClose }: { posts: Reel[], onClose: () => vo
               <div className="text-white text-sm mb-4 line-clamp-3">{post.caption}</div>
               <div className="flex items-center gap-2 text-white/90 text-sm mb-8 font-medium">
                 <MapPin size={16} /> {post.location}
+                <button 
+                  onClick={() => handleSaveLocation(post.location)}
+                  disabled={isSaving}
+                  className="ml-2 bg-white/20 hover:bg-white/30 p-1 rounded-full transition-colors"
+                >
+                  <Plus size={16} />
+                </button>
               </div>
               <div className="absolute right-6 bottom-24 flex flex-col gap-8">
                 <button className="flex flex-col items-center gap-1 text-white hover:scale-110 transition-transform">

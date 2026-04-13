@@ -30,7 +30,10 @@ export const Onboarding = () => {
       handleNext();
     } catch (error: any) {
       console.error("Error signing in with Google", error);
-      if (error.code === 'auth/internal-error') {
+      if (error.code === 'auth/popup-closed-by-user') {
+        // User closed the popup, do nothing or show a subtle message
+        console.log("User closed the Google sign-in popup.");
+      } else if (error.code === 'auth/internal-error') {
         showToast("Internal authentication error. Please ensure Google Sign-in is enabled in your Firebase Console.");
       } else {
         showToast(`Error signing in with Google: ${error.message}`);

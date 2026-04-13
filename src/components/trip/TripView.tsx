@@ -1,9 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence, useDragControls } from 'motion/react';
-import { ChevronLeft, ChevronRight, Share2, Edit2, Map as MapIcon, List, Clock, Navigation, Info, X, Star, Globe, Phone, MapPin, Music, Sparkles, Save, Check, Zap, Plus, ExternalLink, Utensils, Landmark, Camera, Tent, ShoppingBag, Coffee, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Share2, Edit2, Map as MapIcon, List, Clock, Navigation, Info, X, Star, Globe, Phone, MapPin, Music, Sparkles, Save, Check, Zap, Plus, ExternalLink, Utensils, Landmark, Camera, Tent, ShoppingBag, Coffee, Calendar, MessageCircle } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useToast } from '../../store/ToastContext';
 import { Spot, Trip, geminiService, getWikipediaImage } from '../../services/geminiService';
+import { BudgetVisualization } from './BudgetVisualization';
+import { TripRhythmVisualization } from './TripRhythmVisualization';
+import { SpotDiversityVisualization } from './SpotDiversityVisualization';
 import { cn } from '../../lib/utils';
 import { MapView } from './MapView';
 import ReactMarkdown from 'react-markdown';
@@ -22,11 +25,18 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
   const [editedDestination, setEditedDestination] = useState('');
   const [editedDates, setEditedDates] = useState('');
   const [editedDuration, setEditedDuration] = useState(1);
-  const [spotDetails, setSpotDetails] = useState<Partial<Spot>>({});
+  const [spotDetails, setSpotDetails] = useState<any>(null);
   const [nearbySpots, setNearbySpots] = useState<Spot[]>([]);
   const [isGettingNearby, setIsGettingNearby] = useState(false);
   const [spotPlan, setSpotPlan] = useState<string | null>(null);
   const [isGettingSpotPlan, setIsGettingSpotPlan] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [tripSummary, setTripSummary] = useState<string | null>(null);
+  const [weather, setWeather] = useState<any>(null);
+  const [isGettingWeather, setIsGettingWeather] = useState(false);
+  const [severeWeatherAlert, setSevereWeatherAlert] = useState<any | null>(null);
+  const [isAlertDismissed, setIsAlertDismissed] = useState(false);
   const [savedSpotDetails, setSavedSpotDetails] = useState<{ shortDescription: string, keywords: string[], newThings: string, upcomingEvents: string } | null>(null);
   const [isGettingSavedSpotDetails, setIsGettingSavedSpotDetails] = useState(false);
   const [fastInfo, setFastInfo] = useState<string | null>(null);
@@ -114,6 +124,38 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
       });
     }
   }, [activeTab, discoverInfo, isGettingDiscoverInfo, currentTrip]);
+
+  React.useEffect(() => {
+    if (currentTrip && currentTrip.spots.length > 0) {
+      const firstSpot = currentTrip.spots[0];
+      if (firstSpot.lat && firstSpot.lng) {
+        setIsGettingWeather(true);
+        fetch(`/api/weather?lat=${firstSpot.lat}&lon=${firstSpot.lng}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.cod === "200") {
+              setWeather(data);
+              // Detect severe weather
+              const severe = data.list.find((f: any) => 
+                ['Rain', 'Thunderstorm', 'Snow'].includes(f.weather[0].main) || 
+                f.main.temp > 35 || 
+                f.main.temp < 0
+              );
+              if (severe) {
+                setSevereWeatherAlert(severe);
+              }
+            } else {
+              showToast("Failed to fetch weather forecast.");
+            }
+          })
+          .catch(err => {
+            console.error(err);
+            showToast("Failed to fetch weather forecast.");
+          })
+          .finally(() => setIsGettingWeather(false));
+      }
+    }
+  }, [currentTrip]);
 
   const handleSave = () => {
     if (currentTrip) {
@@ -224,17 +266,24 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
       setIsGettingFastInfo(false);
     }).catch(() => setIsGettingFastInfo(false));
 
-    // Get spot plan
+    // Get spot details
     if (currentTrip) {
-      geminiService.getSpotPlan(spot.name, currentTrip.destination).then(plan => {
-        setSpotPlan(plan);
+      geminiService.getSpotDetails(spot.name, currentTrip.destination).then(details => {
+        setSpotDetails(details);
         setIsGettingSpotPlan(false);
       }).catch(() => setIsGettingSpotPlan(false));
+    } else {
+      setIsGettingSpotPlan(false);
     }
 
     // Get saved spot details (basic details, new things, upcoming events)
-    geminiService.getSavedSpotDetails(queryName).then(details => {
-      setSavedSpotDetails(details);
+    geminiService.getSpotDetails(queryName, currentTrip?.destination || '').then(details => {
+      setSavedSpotDetails({
+        shortDescription: details.insights,
+        keywords: [],
+        newThings: details.openingHours,
+        upcomingEvents: details.reviews.join(', ')
+      });
       setIsGettingSavedSpotDetails(false);
     }).catch(() => setIsGettingSavedSpotDetails(false));
 
@@ -301,6 +350,19 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
       addTrip(updatedTrip);
     }
     showToast(`Added ${spot.name} to Day ${activeDay}!`);
+  };
+
+  const handleUpdateSpot = (updatedSpot: Spot) => {
+    if (!currentTrip) return;
+    const newSpots = currentTrip.spots.map(s => s.id === updatedSpot.id ? updatedSpot : s);
+    const newItinerary = currentTrip.itinerary.map(day => ({
+      ...day,
+      spots: day.spots.map(s => s.id === updatedSpot.id ? updatedSpot : s)
+    }));
+    setCurrentTrip({ ...currentTrip, spots: newSpots, itinerary: newItinerary });
+    if (trips.find(t => t.id === currentTrip.id)) {
+      addTrip({ ...currentTrip, spots: newSpots, itinerary: newItinerary });
+    }
   };
 
   const handleShare = async () => {
@@ -506,7 +568,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
       initial={{ opacity: 0, y: 50 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 50 }}
-      className="fixed inset-0 bg-white z-40 flex flex-col md:flex-row"
+      className="fixed inset-0 bg-slate-50 z-40 flex flex-col md:flex-row"
     >
       {/* Map Area */}
       <div className={cn(
@@ -522,6 +584,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
           currentDay={activeDay}
           onSpotClick={handleSpotClick}
           onAddNearbySpot={handleAddNearbySpot}
+          onUpdateSpot={handleUpdateSpot}
           isSidebarOpen={isSidebarOpen}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-transparent pointer-events-none" />
@@ -729,6 +792,49 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                   </div>
                 )}
 
+                {severeWeatherAlert && !isAlertDismissed && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0, scale: [1, 1.02, 1] }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                    className="bg-red-50 border border-red-200 p-4 rounded-2xl mb-8 flex items-start gap-4"
+                  >
+                    <div className="bg-red-100 p-2 rounded-full text-red-600">
+                      <Zap size={20} />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-red-900">Severe Weather Alert</h4>
+                      <p className="text-sm text-red-700">
+                        Severe weather ({severeWeatherAlert.weather[0].main}) is predicted for {new Date(severeWeatherAlert.dt * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}. Please stay safe!
+                      </p>
+                    </div>
+                    <button onClick={() => setIsAlertDismissed(true)} className="text-red-400 hover:text-red-600">
+                      <X size={20} />
+                    </button>
+                  </motion.div>
+                )}
+
+                {weather && (
+                  <div className="space-y-4 mb-8">
+                    <h3 className="text-lg font-bold text-slate-800">Weather Forecast</h3>
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="text-4xl font-bold text-slate-900">{Math.round(weather.list[0].main.temp)}°C</div>
+                        <img src={`https://openweathermap.org/img/wn/${weather.list[0].weather[0].icon}@2x.png`} alt="weather icon" />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {weather.list.slice(1, 4).map((forecast: any, i: number) => (
+                          <div key={i} className="text-center bg-slate-50 p-2 rounded-xl">
+                            <div className="text-xs text-slate-500">{new Date(forecast.dt * 1000).toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                            <img src={`https://openweathermap.org/img/wn/${forecast.weather[0].icon}.png`} alt="weather icon" className="mx-auto" />
+                            <div className="font-bold text-sm">{Math.round(forecast.main.temp)}°C</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {currentTrip.itinerary.map((day, i) => (
                   <div key={i} className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -744,7 +850,24 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                       )}
                     </div>
                     <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
-                      <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">Itinerary Overview</div>
+                      <div className="text-xs text-slate-400 font-medium uppercase tracking-wider flex justify-between items-center">
+                        Itinerary Overview
+                        <button 
+                          onClick={async () => {
+                            setIsOptimizing(true);
+                            const optimizedSpots = await geminiService.optimizeRoute(day.spots);
+                            const newItinerary = [...currentTrip.itinerary];
+                            newItinerary[i].spots = optimizedSpots;
+                            setCurrentTrip({ ...currentTrip, itinerary: newItinerary });
+                            setIsOptimizing(false);
+                            showToast("Route optimized!");
+                          }}
+                          disabled={isOptimizing}
+                          className="text-brand font-bold hover:underline"
+                        >
+                          {isOptimizing ? 'Optimizing...' : 'Optimize Route'}
+                        </button>
+                      </div>
                       <div className="text-sm text-slate-600 leading-relaxed">
                         {day.spots.map((s, idx) => (
                           <span key={`${s.id}-${idx}`} className="inline-flex items-center group">
@@ -902,7 +1025,26 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-8"
               >
-                <div className="bg-brand/5 rounded-3xl p-6 border border-brand/10 mb-6">
+                <div className="bg-white rounded-[var(--radius-card)] p-6 border border-slate-100 shadow-sm mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg text-slate-900">Trip Summary</h3>
+                    <button 
+                      onClick={async () => {
+                        setIsSummarizing(true);
+                        const summary = await geminiService.getTripSummary(currentTrip);
+                        setTripSummary(summary);
+                        setIsSummarizing(false);
+                      }}
+                      disabled={isSummarizing}
+                      className="text-brand text-sm font-bold hover:underline"
+                    >
+                      {isSummarizing ? 'Generating...' : 'Generate Summary'}
+                    </button>
+                  </div>
+                  {tripSummary && <p className="text-sm text-slate-600 mb-4">{tripSummary}</p>}
+                  <BudgetVisualization />
+                  <TripRhythmVisualization />
+                  <SpotDiversityVisualization />
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-brand rounded-full flex items-center justify-center text-white">
                       <Sparkles size={20} />
@@ -949,6 +1091,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                             <div className="flex-1">
                               <h5 className="font-bold text-sm text-slate-900">{spot.name}</h5>
                               <p className="text-xs text-slate-500 line-clamp-2">{spot.description}</p>
+                              <span className="text-[10px] font-bold text-brand uppercase">{spot.category}</span>
                             </div>
                             <button 
                               onClick={() => handleAddSpot(spot)}
@@ -1031,27 +1174,42 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                   </div>
                 </div>
 
-                {/* Opening Hours & Reviews */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  {spotDetails.openingHours && (
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      <div className="flex items-center gap-2 text-slate-500 mb-1">
-                        <Clock size={14} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Hours</span>
-                      </div>
-                      <div className="text-xs font-medium text-slate-800">{spotDetails.openingHours}</div>
+                {/* Opening Hours */}
+                {spotDetails.openingHours && (
+                  <div className="bg-slate-50 p-4 rounded-2xl mb-6 border border-slate-100">
+                    <div className="flex items-center gap-2 text-slate-500 mb-2">
+                      <Clock size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">Opening Hours</span>
                     </div>
-                  )}
-                  {spotDetails.reviewSnippets && spotDetails.reviewSnippets.length > 0 && (
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      <div className="flex items-center gap-2 text-slate-500 mb-1">
-                        <Star size={14} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Top Review</span>
-                      </div>
-                      <div className="text-xs font-medium text-slate-800 line-clamp-2 italic">"{spotDetails.reviewSnippets[0]}"</div>
+                    <div className="text-sm font-medium text-slate-800">{spotDetails.openingHours}</div>
+                  </div>
+                )}
+
+                {/* Insights */}
+                {spotDetails.insights && (
+                  <div className="bg-indigo-50 p-4 rounded-2xl mb-6 border border-indigo-100">
+                    <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                      <Sparkles size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">AI Insight</span>
                     </div>
-                  )}
-                </div>
+                    <p className="text-sm text-indigo-900 leading-relaxed">{spotDetails.insights}</p>
+                  </div>
+                )}
+
+                {/* Community Reviews */}
+                {spotDetails.reviews && spotDetails.reviews.length > 0 && (
+                  <div className="bg-slate-50 p-4 rounded-2xl mb-6 border border-slate-100">
+                    <div className="flex items-center gap-2 text-slate-500 mb-3">
+                      <MessageCircle size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">Community Reviews</span>
+                    </div>
+                    <ul className="space-y-2">
+                      {spotDetails.reviews.map((review, i) => (
+                        <li key={i} className="text-xs text-slate-700 italic">"{review}"</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 {currentTrip && !currentTrip.spots.some(s => s.id === selectedSpot.id) && (
                   <button

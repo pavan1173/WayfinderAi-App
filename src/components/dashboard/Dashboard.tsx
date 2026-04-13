@@ -6,7 +6,7 @@ import { doc, deleteDoc } from 'firebase/firestore';
 import { useApp } from '../../store/AppContext';
 import { useToast } from '../../store/ToastContext';
 import { ReelsFeed } from '../ReelsFeed';
-import { MapPin, Calendar, Plus, Compass, Heart, User, ChevronRight, Sparkles, X, Trash2, Mail, MessageCircle, Star as StarIcon, Share, Shield, FileText as FileIcon, LogOut, Instagram, Video, Info, Pencil, Bookmark, Download } from 'lucide-react';
+import { MapPin, Calendar, Plus, Compass, Heart, User, ChevronRight, Sparkles, X, Trash2, Mail, MessageCircle, Star as StarIcon, Share, Shield, FileText as FileIcon, LogOut, Instagram, Video, Info, Pencil, Bookmark, Download, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { geminiService } from '../../services/geminiService';
 import ReactMarkdown from 'react-markdown';
@@ -40,6 +40,13 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   const [isPlanningFromSaved, setIsPlanningFromSaved] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullY, setPullY] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearch = () => {
+    if (!searchQuery.trim()) return;
+    handlePlanTrip(searchQuery);
+    setSearchQuery('');
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -57,7 +64,7 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   };
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const startY = React.useRef(0);
-  const { setUser } = useApp();
+  const { setUser, currentTrip } = useApp();
   
   const toggleSpotSelection = (spot: Spot) => {
     setSelectedSpots(prev => 
@@ -100,9 +107,12 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   const handleTouchEnd = async () => {
     if (pullY > 50) {
       setIsRefreshing(true);
-      // Simulate network request
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Simulate data refresh
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
       setIsRefreshing(false);
+      showToast("Dashboard refreshed!");
     }
     setPullY(0);
     startY.current = 0;
@@ -197,7 +207,7 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
     setIsThinking(true);
     setChatResponse('');
     try {
-      const response = await geminiService.complexTripAdvice(chatQuery);
+      const response = await geminiService.complexTripAdvice(chatQuery, currentTrip);
       setChatResponse(response);
     } catch (e) {
       setChatResponse("Sorry, I encountered an error while thinking. Please try again.");
@@ -211,8 +221,13 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
     setSavedSpotDetails(null);
     setIsGettingSpotDetails(true);
     try {
-      const details = await geminiService.getSavedSpotDetails(spot.name);
-      setSavedSpotDetails(details);
+      const details = await geminiService.getSpotDetails(spot.name, 'the destination'); // Need a destination
+      setSavedSpotDetails({
+        shortDescription: details.insights,
+        keywords: [],
+        newThings: details.openingHours,
+        upcomingEvents: details.reviews.join(', ')
+      });
     } catch (e) {
       showToast("Failed to load spot details.");
     } finally {
@@ -358,6 +373,29 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                 transition={{ duration: 0.2 }}
                 className="max-w-6xl mx-auto"
               >
+            {/* Search Bar */}
+            <motion.section variants={itemVariants} className="mt-4 card p-6">
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Search size={20} />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Where to next?"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius-button)] py-4 pl-12 pr-24 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all"
+                />
+                <button
+                  onClick={handleSearch}
+                  className="absolute right-2 top-2 bottom-2 bg-brand text-white px-6 rounded-[var(--radius-button)] font-bold text-sm hover:bg-brand-dark transition-colors"
+                >
+                  Search
+                </button>
+              </div>
+            </motion.section>
+
             {/* Chat with Wayfinder Ai */}
             <motion.section variants={itemVariants} className="mt-4">
               <button 
@@ -486,63 +524,65 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                     {(showAllTrips ? trips : trips.slice(0, 3)).map(trip => (
                       <motion.div 
                         key={trip.id}
-                        whileHover={{ scale: 1.02, backgroundColor: "#f1f5f9" }}
-                        whileTap={{ scale: 0.98 }}
-                        className="bg-white p-3 rounded-3xl flex items-center gap-3 cursor-pointer border border-slate-100 shadow-sm transition-colors"
+                        whileHover={{ scale: 1.01, backgroundColor: "#f8fafc" }}
+                        whileTap={{ scale: 0.99 }}
+                        className="bg-white p-4 rounded-[var(--radius-card)] flex items-center gap-4 cursor-pointer border border-slate-200 shadow-sm transition-all"
+                        onClick={() => setCurrentTrip(trip)}
                       >
-                      <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0">
-                        <img 
-                        src={trip.spots?.[0]?.imageUrl || `https://loremflickr.com/600/400/${encodeURIComponent(trip.destination.split(' ').join(','))}`} 
-                        className="w-full h-full object-cover" 
-                        referrerPolicy="no-referrer" 
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(trip.destination)}/600/400`; }}
-                      />
-                      </div>
-                      <div className="flex-1 bg-white rounded-2xl p-3 flex items-center justify-between">
-                        {editingTripId === trip.id ? (
-                          <div className="flex flex-col gap-2 w-full">
-                            <input type="text" value={editValues?.destination} onChange={(e) => setEditValues(prev => prev ? {...prev, destination: e.target.value} : null)} className="border rounded p-1 text-sm" />
-                            <input type="text" value={editValues?.dates} onChange={(e) => setEditValues(prev => prev ? {...prev, dates: e.target.value} : null)} className="border rounded p-1 text-sm" />
-                            <input type="number" value={editValues?.duration} onChange={(e) => setEditValues(prev => prev ? {...prev, duration: parseInt(e.target.value)} : null)} className="border rounded p-1 text-sm" />
-                            <div className="flex gap-2">
-                              <button onClick={() => handleSaveEdit(trip)} className="bg-brand text-white px-2 py-1 rounded text-xs">Save</button>
-                              <button onClick={handleCancelEdit} className="bg-slate-200 px-2 py-1 rounded text-xs">Cancel</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex flex-col justify-center" onClick={() => setCurrentTrip(trip)}>
-                              <div className="font-bold text-slate-800 text-sm leading-tight">{trip.duration}-Day {trip.destination}<br/>Trip</div>
-                              <div className="text-xs text-slate-500 mt-0.5">{trip.spots.length} Spots</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="p-1.5 text-slate-300 hover:text-brand transition-colors"><Pencil size={16} /></button>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleExportTrip(trip);
-                                }}
-                                className="p-1.5 text-slate-300 hover:text-brand transition-colors"
-                              >
-                                <Download size={16} />
-                              </button>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setTripToDelete(trip.id);
-                                }}
-                                className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                              <div className="w-6 h-6 rounded-full bg-slate-50 flex items-center justify-center">
-                                <ChevronRight size={14} className="text-slate-400" />
+                        <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0">
+                          <img 
+                            src={trip.spots?.[0]?.imageUrl || `https://loremflickr.com/600/400/${encodeURIComponent(trip.destination.split(' ').join(','))}`} 
+                            className="w-full h-full object-cover" 
+                            referrerPolicy="no-referrer" 
+                            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(trip.destination)}/600/400`; }}
+                          />
+                        </div>
+                        
+                        <div className="flex-1 flex items-center justify-between">
+                          {editingTripId === trip.id ? (
+                            <div className="flex flex-col gap-2 w-full">
+                              <input type="text" value={editValues?.destination} onChange={(e) => setEditValues(prev => prev ? {...prev, destination: e.target.value} : null)} className="border rounded p-1 text-sm" />
+                              <input type="text" value={editValues?.dates} onChange={(e) => setEditValues(prev => prev ? {...prev, dates: e.target.value} : null)} className="border rounded p-1 text-sm" />
+                              <input type="number" value={editValues?.duration} onChange={(e) => setEditValues(prev => prev ? {...prev, duration: parseInt(e.target.value)} : null)} className="border rounded p-1 text-sm" />
+                              <div className="flex gap-2">
+                                <button onClick={() => handleSaveEdit(trip)} className="bg-brand text-white px-2 py-1 rounded text-xs">Save</button>
+                                <button onClick={handleCancelEdit} className="bg-slate-200 px-2 py-1 rounded text-xs">Cancel</button>
                               </div>
                             </div>
-                          </>
-                        )}
-                      </div>
-                    </motion.div>
+                          ) : (
+                            <>
+                              <div className="flex flex-col justify-center">
+                                <div className="font-bold text-slate-900 text-sm leading-tight">{trip.duration}-Day {trip.destination}<br/>Trip</div>
+                                <div className="text-xs text-slate-500 mt-0.5">{trip.spots.length} Spots</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="p-2 text-slate-400 hover:text-brand transition-colors"><Pencil size={18} /></button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleExportTrip(trip);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-brand transition-colors"
+                                >
+                                  <Download size={18} />
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTripToDelete(trip.id);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center">
+                                  <ChevronRight size={18} className="text-slate-400" />
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </motion.div>
                   ))}
                 </div>
               ) : (
@@ -733,9 +773,9 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                           setEditBio(user?.bio || '');
                           setIsEditingProfile(true);
                         }} 
-                        className="text-slate-400 hover:text-brand transition-colors p-2 opacity-0 group-hover:opacity-100"
+                        className="text-xs font-bold text-brand hover:text-brand-dark transition-colors"
                       >
-                        <Pencil size={16} />
+                        Edit
                       </button>
                     </div>
                   )}

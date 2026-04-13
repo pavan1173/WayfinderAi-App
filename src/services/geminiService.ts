@@ -36,6 +36,24 @@ async function handleGeminiError<T>(error: any, fallback: T, context: string): P
   return fallback;
 }
 
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const isRateLimit = error.message?.includes("429") || error.status === 429 || error.code === 429;
+    if (retries > 0 && isRateLimit) {
+      const jitter = Math.random() * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay + jitter));
+      return withRetry(fn, retries - 1, delay * 2);
+    } else if (retries > 0) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return withRetry(fn, retries - 1, delay);
+    }
+    throw error;
+  }
+}
+
+// ... (rest of the file)
 export interface Spot {
   id: string;
   name: string;
@@ -54,6 +72,7 @@ export interface Spot {
   lat?: number;
   lng?: number;
   reason?: string;
+  markerIcon?: string;
 }
 
 export interface Hotel {
@@ -114,9 +133,22 @@ export async function getWikipediaImage(query: string): Promise<string> {
 }
 
 export const geminiService = {
+  async getTripSummary(trip: Trip): Promise<string> {
+    try {
+      const response = await withRetry(() => ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Provide a concise, engaging summary of the following trip: ${JSON.stringify(trip)}. Highlight the key spots and the overall vibe.`,
+      }));
+      return response.text || "No summary available.";
+    } catch (e) {
+      console.error("Failed to get trip summary", e);
+      return "Unable to generate summary at this time.";
+    }
+  },
+
   async extractSpotsFromText(text: string): Promise<Spot[]> {
     try {
-      const response = await ai.models.generateContent({
+      const response = await withRetry(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Extract travel spots from: "${text}". Provide: name, description, category, lat, lng.`,
         config: {
@@ -137,7 +169,7 @@ export const geminiService = {
             },
           },
         },
-      });
+      }));
 
       const spots = JSON.parse(response.text);
       const uniqueSpots = spots.filter((s: any, index: number, self: any[]) => 
@@ -155,7 +187,7 @@ export const geminiService = {
 
   async getSpotDetailsWithMaps(spotName: string, location?: { lat: number, lng: number }): Promise<Partial<Spot>> {
     try {
-      const response = await ai.models.generateContent({
+      const response = await withRetry(() => ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `Find Maps info for: "${spotName}". Include website, phone, opening hours, lat, lng.`,
         config: {
@@ -166,7 +198,7 @@ export const geminiService = {
             }
           }
         },
-      });
+      }));
 
       const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
       const mapsUri = groundingChunks?.find(c => c.maps?.uri)?.maps?.uri;
@@ -292,16 +324,18 @@ export const geminiService = {
     }
   },
 
-  async complexTripAdvice(query: string): Promise<string> {
+  async complexTripAdvice(query: string, trip: Trip | null): Promise<string> {
     try {
+      const tripContext = trip ? `\n\nContext about the user's current trip: ${JSON.stringify(trip)}` : "";
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: query,
+        contents: `${query}${tripContext}`,
         config: {
-          },
+          tools: [{ googleSearch: {} }],
+        },
       });
       
-      let text = response.text;
+      let text = response.text || "No advice available.";
       const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
       if (chunks && chunks.length > 0) {
         const urls = chunks.map(c => c.web?.uri).filter(Boolean);
@@ -319,7 +353,15 @@ export const geminiService = {
     try {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Analyze the content of this social media link: ${url}. Identify all travel destinations, landmarks, or spots mentioned or shown. For each spot, provide a name, a vivid description of what makes it special, a category, and approximate latitude/longitude coordinates. Return the data as a JSON array of objects.`,
+        contents: `Analyze the content of this social media link: ${url}. 
+        Identify all travel destinations, landmarks, restaurants, or hidden gems mentioned or shown. 
+        For each spot, provide:
+        - name: The name of the place.
+        - description: A vivid description of what makes it special.
+        - category: The type of place (e.g., Restaurant, Landmark, Nature).
+        - lat: Approximate latitude (if unknown, use 0).
+        - lng: Approximate longitude (if unknown, use 0).
+        Return a JSON array of objects. If a field is unknown, use reasonable defaults.`,
         config: {
           tools: [{ urlContext: {} }],
           responseMimeType: "application/json",
@@ -366,7 +408,15 @@ export const geminiService = {
                 data: videoData
               }
             },
-            { text: "Analyze this Instagram Reel/Video. Identify all travel destinations, landmarks, or spots mentioned or shown. For each spot, provide a name, a vivid description of what makes it special, a category, and approximate latitude/longitude coordinates. CRITICAL: Verify the location name and ensure it is a real, specific, and accurate place. If you are unsure about a place, do not include it. Return the data as a JSON array of objects." }
+            { text: `Analyze this Instagram Reel/Video. 
+            Identify all travel destinations, landmarks, restaurants, or hidden gems mentioned or shown. 
+            For each spot, provide:
+            - name: The name of the place.
+            - description: A vivid description of what makes it special.
+            - category: The type of place (e.g., Restaurant, Landmark, Nature).
+            - lat: Approximate latitude (if unknown, use 0).
+            - lng: Approximate longitude (if unknown, use 0).
+            CRITICAL: Verify the location name and ensure it is a real, specific, and accurate place. If you are unsure about a place, do not include it. Return the data as a JSON array of objects.` }
           ]
         },
         config: {
@@ -465,7 +515,7 @@ export const geminiService = {
         contents: `Provide a comprehensive travel guide for ${destination}. 
         Include the following sections clearly formatted with Markdown headers (##):
         ## Things to Do
-        List the top 5 must-do activities or attractions.
+        List the top 5 must-do activities or attractions. For each, include a relevant emoji at the start of the line (e.g., 🍴 for food, 🏔️ for nature, 🏛️ for landmarks).
         
         ## Nearby Places
         List 3-4 interesting places or day trips near ${destination}.
@@ -655,7 +705,7 @@ export const geminiService = {
   async getNearbySpots(lat: number, lng: number, category?: string): Promise<Spot[]> {
     try {
       // Step 1: Get information using Google Maps grounding
-      const response = await ai.models.generateContent({
+      const response = await withRetry(() => ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `Find 8 highly-rated and interesting ${category || 'travel spots, restaurants, or attractions'} near this location (Lat: ${lat}, Lng: ${lng}). For each, provide a name, a detailed description, a category, and exact latitude and longitude coordinates.`,
         config: {
@@ -666,12 +716,12 @@ export const geminiService = {
             }
           }
         },
-      });
+      }));
 
       const infoText = response.text;
 
       // Step 2: Use a fast model to structure the text into JSON
-      const structuredResponse = await ai.models.generateContent({
+      const structuredResponse = await withRetry(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Text: ${infoText}`,
         config: {
@@ -691,7 +741,7 @@ export const geminiService = {
             },
           },
         },
-      });
+      }));
 
       const spots = JSON.parse(structuredResponse.text);
       const uniqueSpots = spots.filter((s: any, index: number, self: any[]) => 
@@ -704,6 +754,38 @@ export const geminiService = {
       })));
     } catch (e) {
       return handleGeminiError(e, [], "getting nearby spots");
+    }
+  },
+
+  async optimizeRoute(spots: Spot[]): Promise<Spot[]> {
+    try {
+      const response = await withRetry(() => ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Reorder the following travel spots to create the most efficient travel route. Return the spots in the new order as a JSON array. Spots: ${JSON.stringify(spots)}`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                name: { type: Type.STRING },
+                description: { type: Type.STRING },
+                category: { type: Type.STRING },
+                lat: { type: Type.NUMBER },
+                lng: { type: Type.NUMBER },
+                imageUrl: { type: Type.STRING },
+              },
+              required: ["id", "name", "description", "category", "lat", "lng"],
+            },
+          },
+        },
+      }));
+      return JSON.parse(response.text);
+    } catch (e) {
+      console.error("Failed to optimize route", e);
+      return spots; // Return original order if optimization fails
     }
   },
 
@@ -791,7 +873,10 @@ export const geminiService = {
 
       const structuredResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Based on these places: ${infoText}\n\nGenerate 3 realistic social media travel posts (like Instagram/TikTok reels). Return a JSON array. For each post, include: author (e.g. @username), location (name of the place), likes (e.g. '12.4K'), comments (e.g. '342'), caption.`,
+        contents: `Analyze this travel-related content or destination: ${infoText}. 
+        Extract all mentioned locations, landmarks, restaurants, and hidden gems.
+        For each place, provide a brief description, category, and why it's worth visiting.
+        Return a JSON array of objects with: name, description, category, imageUrl (use a placeholder if unknown).`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -799,34 +884,31 @@ export const geminiService = {
             items: {
               type: Type.OBJECT,
               properties: {
-                author: { type: Type.STRING },
-                location: { type: Type.STRING },
-                likes: { type: Type.STRING },
-                comments: { type: Type.STRING },
-                caption: { type: Type.STRING },
+                name: { type: Type.STRING },
+                description: { type: Type.STRING },
+                category: { type: Type.STRING },
+                imageUrl: { type: Type.STRING },
               },
-              required: ["author", "location", "likes", "comments", "caption"],
+              required: ["name", "description", "category", "imageUrl"],
             },
           },
         },
       });
 
-      const posts = JSON.parse(structuredResponse.text);
-      const result = await Promise.all(posts.map(async (p: any, i: number) => ({
-        ...p,
+      const spots = JSON.parse(structuredResponse.text);
+      const result = await Promise.all(spots.map(async (s: any, i: number) => ({
+        ...s,
         id: i + 1,
-        image: await getWikipediaImage(p.location),
-        isLiked: false,
-        isSaved: false,
+        imageUrl: s.imageUrl || await getWikipediaImage(s.name),
       })));
 
       localStorage.setItem(cacheKey, JSON.stringify({ data: result, timestamp: Date.now() }));
       return result;
     } catch (e: any) {
       return handleGeminiError(e, [
-        { id: 'mock1', platform: 'Instagram', author: '@travel_guru', image: 'https://loremflickr.com/600/400/beach', caption: 'Beautiful beach day! 🏖️', likes: '1.2k', location: 'Beach', comments: '50', isLiked: false, isSaved: false },
-        { id: 'mock2', platform: 'TikTok', author: '@city_explorer', image: 'https://loremflickr.com/600/400/city', caption: 'Exploring the city! 🏙️', likes: '3.5k', location: 'City', comments: '120', isLiked: false, isSaved: false },
-        { id: 'mock3', platform: 'Instagram', author: '@mountain_lover', image: 'https://loremflickr.com/600/400/mountain', caption: 'Mountain views! 🏔️', likes: '2.8k', location: 'Mountain', comments: '85', isLiked: false, isSaved: false },
+        { id: 'mock1', name: 'Beach', description: 'Beautiful beach', category: 'Nature', imageUrl: 'https://loremflickr.com/600/400/beach' },
+        { id: 'mock2', name: 'City', description: 'Exploring the city', category: 'City', imageUrl: 'https://loremflickr.com/600/400/city' },
+        { id: 'mock3', name: 'Mountain', description: 'Mountain views', category: 'Nature', imageUrl: 'https://loremflickr.com/600/400/mountain' },
       ], "local social inspiration");
     }
   },
@@ -852,30 +934,28 @@ export const geminiService = {
     }
   },
 
-  async getSavedSpotDetails(spotName: string): Promise<{ shortDescription: string, keywords: string[], newThings: string, upcomingEvents: string }> {
+  async getSpotDetails(spotName: string, destination: string): Promise<{ openingHours: string, reviews: string[], insights: string }> {
     try {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Provide detailed information about ${spotName}. Return a JSON object with four keys:
-        1. "shortDescription": A concise, 2-3 sentence overview of the location.
-        2. "keywords": An array of 3-5 short keywords or tags.
-        3. "newThings": Recent developments or hidden gems.
-        4. "upcomingEvents": Provide 2-3 specific upcoming events or recurring seasonal events at or near this location, including basic details (dates, what to expect). Format this beautifully with markdown bullet points.
+        contents: `Provide detailed information about ${spotName} in ${destination}. Return a JSON object with:
+        1. "openingHours": A string describing the opening hours.
+        2. "reviews": An array of 3-5 strings representing community reviews.
+        3. "insights": A brief, 2-3 sentence AI-generated insight about the spot.
         Ensure the response is valid JSON.`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              shortDescription: { type: Type.STRING },
-              keywords: { 
+              openingHours: { type: Type.STRING },
+              reviews: { 
                 type: Type.ARRAY,
                 items: { type: Type.STRING }
               },
-              newThings: { type: Type.STRING },
-              upcomingEvents: { type: Type.STRING }
+              insights: { type: Type.STRING }
             },
-            required: ["shortDescription", "keywords", "newThings", "upcomingEvents"]
+            required: ["openingHours", "reviews", "insights"]
           }
         }
       });
@@ -883,11 +963,10 @@ export const geminiService = {
       return JSON.parse(response.text);
     } catch (e) {
       return handleGeminiError(e, {
-        shortDescription: "Information not available.",
-        keywords: [],
-        newThings: "Information not available.",
-        upcomingEvents: "Information not available."
-      }, "getting saved spot details");
+        openingHours: "Information not available.",
+        reviews: [],
+        insights: "Information not available."
+      }, "getting spot details");
     }
   }
 };

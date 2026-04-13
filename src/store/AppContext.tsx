@@ -67,10 +67,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setSavedReels(userData.savedReels || []);
           setImportHistory(userData.importHistory || []);
           setSearchHistory(userData.searchHistory || []);
+          setOnboarded(true); // Set onboarded to true if user exists
         } else {
           const newUser = { name: firebaseUser.displayName || 'User', avatar: firebaseUser.photoURL || '', bio: '', uid: firebaseUser.uid, trips: [], savedSpots: [], savedReels: [], importHistory: [], searchHistory: [] };
           await setDoc(userDocRef, newUser);
           setUser(newUser);
+          // New user should go through onboarding, so don't set onboarded to true
         }
       } else {
         setUser(null);
