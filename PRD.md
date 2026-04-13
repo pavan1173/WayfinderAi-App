@@ -18,4 +18,6 @@ A web-based trip planning application that helps users discover destinations, pl
 - **Map Clustering:** Efficiently visualize multiple markers on the map.
 - **Chat with Wayfinder AI:** Interactive chat interface for trip planning and advice.
 - **Spot Details:** Rich details for spots including opening hours, reviews, and AI insights.
+- **Pull-to-Refresh:** Refresh dashboard data with a pull-down gesture.
+- **Social Media Reel Analysis:** Extract travel spots and details from Instagram/TikTok links and reels.
 
