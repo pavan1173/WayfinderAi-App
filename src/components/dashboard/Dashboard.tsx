@@ -41,12 +41,32 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullY, setPullY] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [tripFilter, setTripFilter] = useState('');
+  const [tripSort, setTripSort] = useState<'name' | 'date'>('date');
+  const [spotFilter, setSpotFilter] = useState('');
+  const [spotSort, setSpotSort] = useState<'name' | 'category'>('name');
 
   const handleSearch = () => {
     if (!searchQuery.trim()) return;
     handlePlanTrip(searchQuery);
     setSearchQuery('');
   };
+
+  // Filter and sort trips
+  const filteredTrips = trips
+    .filter(trip => trip.destination.toLowerCase().includes(tripFilter.toLowerCase()))
+    .sort((a, b) => {
+      if (tripSort === 'name') return a.destination.localeCompare(b.destination);
+      return (b.dates || '').localeCompare(a.dates || ''); // Simple date sort
+    });
+
+  // Filter and sort savedSpots
+  const filteredSpots = savedSpots
+    .filter(spot => spot.category.toLowerCase().includes(spotFilter.toLowerCase()))
+    .sort((a, b) => {
+      if (spotSort === 'name') return a.name.localeCompare(b.name);
+      return a.category.localeCompare(b.category);
+    });
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -509,6 +529,13 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
               >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-slate-800">My Trips</h2>
+                  <div className="flex gap-2">
+                    <input type="text" placeholder="Filter by destination" value={tripFilter} onChange={(e) => setTripFilter(e.target.value)} className="border rounded-lg px-2 py-1 text-xs" />
+                    <select value={tripSort} onChange={(e) => setTripSort(e.target.value as 'name' | 'date')} className="border rounded-lg px-2 py-1 text-xs">
+                      <option value="date">Sort by Date</option>
+                      <option value="name">Sort by Name</option>
+                    </select>
+                  </div>
                   {trips.length > 3 && (
                     <button 
                       onClick={() => setShowAllTrips(!showAllTrips)} 
@@ -519,9 +546,9 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                   )}
                 </div>
                 
-                {trips.length > 0 ? (
+                {filteredTrips.length > 0 ? (
                   <div className="flex flex-col gap-4">
-                    {(showAllTrips ? trips : trips.slice(0, 3)).map(trip => (
+                    {(showAllTrips ? filteredTrips : filteredTrips.slice(0, 3)).map(trip => (
                       <motion.div 
                         key={trip.id}
                         whileHover={{ scale: 1.01, backgroundColor: "#f8fafc" }}
@@ -642,6 +669,13 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
             >
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-slate-800">Saved Spots</h2>
+                <div className="flex gap-2">
+                  <input type="text" placeholder="Filter by category" value={spotFilter} onChange={(e) => setSpotFilter(e.target.value)} className="border rounded-lg px-2 py-1 text-xs" />
+                  <select value={spotSort} onChange={(e) => setSpotSort(e.target.value as 'name' | 'category')} className="border rounded-lg px-2 py-1 text-xs">
+                    <option value="name">Sort by Name</option>
+                    <option value="category">Sort by Category</option>
+                  </select>
+                </div>
                 {savedSpots.length > 0 && (
                   <button 
                     onClick={handlePlanTripFromSavedSpots}
@@ -662,7 +696,7 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                   </button>
                 )}
               </div>
-              {savedSpots.length > 0 ? (
+              {filteredSpots.length > 0 ? (
                 <motion.div 
                   className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"
                   initial="hidden"
@@ -671,7 +705,7 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                     visible: { transition: { staggerChildren: 0.1 } }
                   }}
                 >
-                  {savedSpots.map(spot => {
+                  {filteredSpots.map(spot => {
                     const isSelected = selectedSpots.some(s => s.id === spot.id);
                     return (
                       <motion.div 
