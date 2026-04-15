@@ -487,13 +487,17 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
             {/* Nearby Places */}
             <motion.section variants={itemVariants} className="mt-8">
               <div className="flex items-center justify-between mb-4">
-                <button 
+                <motion.button 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileHover={{ scale: 1.05, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={handleNearbyClick}
-                  className="bg-brand text-white px-4 py-2 rounded-xl shadow-md font-semibold flex items-center gap-2 hover:bg-brand-dark transition-all"
+                  className="bg-gradient-to-r from-brand to-brand-dark text-white px-6 py-3 rounded-2xl shadow-lg font-bold flex items-center gap-2 transition-all"
                 >
                   Nearby Places
                   {isLoadingNearby && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                </button>
+                </motion.button>
                 {showNearby && nearbySpots.length > 0 && (
                   <button onClick={() => showToast("These are the places that are nearby to you.")} className="p-1 hover:bg-slate-100 rounded-full transition-colors">
                     <Info size={16} className="text-brand" />
