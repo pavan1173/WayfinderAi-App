@@ -17,9 +17,10 @@ const PREFERENCES = [
 
 export const TripPlanner = ({ onClose, initialDestination = '', initialSpots, initialDuration = 3 }: { onClose: () => void, initialDestination?: string, initialSpots?: Spot[], initialDuration?: number }) => {
   const { showToast } = useToast();
-  const [step, setStep] = useState<'destination' | 'preferences' | 'duration' | 'spots' | 'planning'>(
+  const [step, setStep] = useState<'destination' | 'preferences' | 'duration' | 'budget' | 'spots' | 'planning'>(
     (initialSpots && initialSpots.length > 0) || initialDestination ? 'preferences' : 'destination'
   );
+  const [budget, setBudget] = useState(1000);
   const [destination, setDestination] = useState(initialDestination);
   const [selectedPrefs, setSelectedPrefs] = useState<string[]>([]);
   const [duration, setDuration] = useState(initialDuration);
@@ -37,6 +38,10 @@ export const TripPlanner = ({ onClose, initialDestination = '', initialSpots, in
   };
 
   const handleDurationSubmit = async () => {
+    setStep('budget');
+  };
+
+  const handleBudgetSubmit = async () => {
     if (initialSpots && initialSpots.length > 0) {
       // If we have initial spots (like saved spots), we skip fetching and go straight to spots selection
       setStep('spots');
@@ -51,7 +56,7 @@ export const TripPlanner = ({ onClose, initialDestination = '', initialSpots, in
       setStep('spots');
     } catch (e) {
       showToast("Failed to find spots. Please try again.");
-      setStep('duration');
+      setStep('budget');
     }
   };
 
@@ -242,66 +247,100 @@ export const TripPlanner = ({ onClose, initialDestination = '', initialSpots, in
             </motion.div>
           )}
 
-          {step === 'duration' && (
-            <motion.div 
-              key="duration"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="mt-8 space-y-8"
-            >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-display font-bold text-slate-900">Trip Duration</h2>
-                <p className="text-slate-500">How many days?</p>
-              </div>
-
-              <div className="flex bg-slate-100 p-1 rounded-2xl">
-                <button 
-                  onClick={() => setIsFlexible(false)}
-                  className={cn(
-                    "flex-1 py-3 rounded-xl font-bold text-sm transition-all",
-                    !isFlexible ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                  )}
+              {step === 'duration' && (
+                <motion.div 
+                  key="duration"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="mt-8 space-y-8"
                 >
-                  Dates
-                </button>
-                <button 
-                  onClick={() => setIsFlexible(true)}
-                  className={cn(
-                    "flex-1 py-3 rounded-xl font-bold text-sm transition-all",
-                    isFlexible ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                  )}
-                >
-                  Flexible
-                </button>
-              </div>
+                  <div className="space-y-2">
+                    <h2 className="text-3xl font-display font-bold text-slate-900">Trip Duration</h2>
+                    <p className="text-slate-500">How many days?</p>
+                  </div>
 
-              <div className="flex flex-col items-center gap-8">
-                <div className="flex items-center gap-6">
+                  <div className="flex bg-slate-100 p-1 rounded-2xl">
+                    <button 
+                      onClick={() => setIsFlexible(false)}
+                      className={cn(
+                        "flex-1 py-3 rounded-xl font-bold text-sm transition-all",
+                        !isFlexible ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                      )}
+                    >
+                      Dates
+                    </button>
+                    <button 
+                      onClick={() => setIsFlexible(true)}
+                      className={cn(
+                        "flex-1 py-3 rounded-xl font-bold text-sm transition-all",
+                        isFlexible ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                      )}
+                    >
+                      Flexible
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col items-center gap-8">
+                    <div className="flex items-center gap-6">
+                      <button 
+                        onClick={() => setDuration(Math.max(1, duration - 1))}
+                        className="w-12 h-12 rounded-full border-2 border-slate-200 flex items-center justify-center text-2xl font-bold text-slate-400"
+                      >
+                        -
+                      </button>
+                      <div className="text-6xl font-display font-bold text-slate-900">{duration}</div>
+                      <button 
+                        onClick={() => setDuration(duration + 1)}
+                        className="w-12 h-12 rounded-full border-2 border-slate-200 flex items-center justify-center text-2xl font-bold text-slate-400"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="text-slate-400 font-medium">Days</div>
+                  </div>
                   <button 
-                    onClick={() => setDuration(Math.max(1, duration - 1))}
-                    className="w-12 h-12 rounded-full border-2 border-slate-200 flex items-center justify-center text-2xl font-bold text-slate-400"
+                    onClick={handleDurationSubmit}
+                    className="w-full bg-brand text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-brand/20"
                   >
-                    -
+                    Continue
                   </button>
-                  <div className="text-6xl font-display font-bold text-slate-900">{duration}</div>
+                </motion.div>
+              )}
+
+              {step === 'budget' && (
+                <motion.div 
+                  key="budget"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="mt-8 space-y-8"
+                >
+                  <div className="space-y-2">
+                    <h2 className="text-3xl font-display font-bold text-slate-900">Trip Budget</h2>
+                    <p className="text-slate-500">What is your estimated budget?</p>
+                  </div>
+
+                  <div className="flex flex-col items-center gap-8">
+                    <div className="text-6xl font-display font-bold text-slate-900">${budget}</div>
+                    <input 
+                      type="range"
+                      min="100"
+                      max="10000"
+                      step="100"
+                      value={budget}
+                      onChange={(e) => setBudget(Number(e.target.value))}
+                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand"
+                    />
+                  </div>
                   <button 
-                    onClick={() => setDuration(duration + 1)}
-                    className="w-12 h-12 rounded-full border-2 border-slate-200 flex items-center justify-center text-2xl font-bold text-slate-400"
+                    onClick={handleBudgetSubmit}
+                    className="w-full bg-brand text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-brand/20"
                   >
-                    +
+                    {initialSpots && initialSpots.length > 0 ? 'Review Spots' : 'Find Spots'}
                   </button>
-                </div>
-                <div className="text-slate-400 font-medium">Days</div>
-              </div>
-              <button 
-                onClick={handleDurationSubmit}
-                className="w-full bg-brand text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-brand/20"
-              >
-                {initialSpots && initialSpots.length > 0 ? 'Review Spots' : 'Find Spots'}
-              </button>
-            </motion.div>
-          )}
+                </motion.div>
+              )}
 
           {step === 'planning' && (
             <motion.div key="planning" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-8 space-y-8">
