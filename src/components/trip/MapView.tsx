@@ -162,8 +162,8 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
       <style>
         {`
           .animated-route {
-            stroke-dasharray: 15;
-            animation: dash 30s linear infinite;
+            stroke-dasharray: 10, 20;
+            animation: dash 20s linear infinite;
           }
           @keyframes dash {
             to {

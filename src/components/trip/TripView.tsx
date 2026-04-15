@@ -191,6 +191,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     if (currentTrip) {
       addTrip(currentTrip);
       setIsSaved(true);
+      showToast("Trip saved successfully!");
     }
   };
 
