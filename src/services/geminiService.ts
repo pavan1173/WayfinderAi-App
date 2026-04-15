@@ -704,10 +704,10 @@ export const geminiService = {
 
   async getNearbySpots(lat: number, lng: number, category?: string): Promise<Spot[]> {
     try {
-      // Step 1: Get information using Google Maps grounding
+      // Step 1: Get information using Google Maps grounding with explicit location
       const response = await withRetry(() => ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `Find 8 highly-rated and interesting ${category || 'travel spots, restaurants, or attractions'} near this location (Lat: ${lat}, Lng: ${lng}). For each, provide a name, a detailed description, a category, and exact latitude and longitude coordinates.`,
+        contents: `Find 10 highly-rated and interesting ${category || 'travel spots, restaurants, or attractions'} near these exact coordinates: Lat: ${lat}, Lng: ${lng}. Provide a name, a detailed description, a category, and exact latitude and longitude coordinates for each.`,
         config: {
           tools: [{ googleMaps: {} }],
           toolConfig: {
@@ -723,7 +723,7 @@ export const geminiService = {
       // Step 2: Use a fast model to structure the text into JSON
       const structuredResponse = await withRetry(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Text: ${infoText}`,
+        contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Ensure the lat/lng are accurate to the location provided. Text: ${infoText}`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
