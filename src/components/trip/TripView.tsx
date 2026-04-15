@@ -626,7 +626,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
           }
         }}
         className={cn(
-          "bg-white -mt-8 md:mt-0 rounded-t-[2.5rem] md:rounded-none shadow-2xl overflow-hidden flex flex-col order-2 md:order-1 z-10 transition-all duration-300",
+          "bg-white -mt-8 md:mt-0 rounded-t-[2.5rem] md:rounded-none shadow-2xl overflow-hidden flex flex-col order-2 md:order-1 z-10 transition-all duration-300 h-[calc(100vh-35vh)] md:h-full",
           isSidebarOpen ? "flex-1 md:w-1/2 lg:w-2/5" : "w-0 md:w-16"
         )}
       >

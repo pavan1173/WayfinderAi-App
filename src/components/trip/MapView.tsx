@@ -135,7 +135,8 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
     }
   };
 
-  const validSpots = spots.filter(s => s.lat !== undefined && s.lng !== undefined);
+  const spotsToRender = orderedSpots && orderedSpots.length > 0 ? orderedSpots : spots;
+  const validSpots = spotsToRender.filter(s => s.lat !== undefined && s.lng !== undefined);
   
   if (validSpots.length === 0) {
     return (
@@ -172,16 +173,21 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
           .active-marker-pulse {
             animation: pulse-subtle 2s ease-in-out infinite;
             z-index: 1000 !important;
+            transform: scale(1.2);
+            transition: transform 0.3s ease;
           }
           @keyframes pulse-subtle {
             0% {
-              transform: scale(1);
+              transform: scale(1.1);
+              box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
             }
             50% {
-              transform: scale(1.1);
+              transform: scale(1.3);
+              box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
             }
             100% {
-              transform: scale(1);
+              transform: scale(1.1);
+              box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
             }
           }
           .custom-numbered-marker {

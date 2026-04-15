@@ -72,6 +72,10 @@
   z-index: 1000 !important;
 }
 
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) {
+  height: 100vh;
+}
+
 div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
   border-width: 0px;
   width: 375px;
