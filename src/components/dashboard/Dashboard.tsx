@@ -311,11 +311,24 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
     }
   };
 
-  const handleNearbyClick = () => {
-    if (nearbySpots.length > 0) {
-      setShowNearby(!showNearby);
-    } else if (userLocation) {
-      fetchNearby(userLocation.lat, userLocation.lng);
+  const handleNearbyClick = async () => {
+    if (navigator.geolocation) {
+      showToast("Updating nearby places...");
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setUserLocation({ lat, lng });
+          await fetchNearby(lat, lng);
+          setShowNearby(true);
+        },
+        (error) => {
+          console.error("Error getting location", error);
+          showToast("Could not get your location. Please enable location services.");
+        }
+      );
+    } else {
+      showToast("Geolocation is not supported by your browser.");
     }
   };
 

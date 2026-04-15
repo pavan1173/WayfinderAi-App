@@ -1,20 +1,31 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Wayfinder Ai
 
-# Run and deploy your AI Studio app
+Wayfinder Ai is a smart, AI-powered travel planning application that helps you discover, plan, and organize your trips.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/6dc7cf04-1a42-4d26-b2f4-0dbad6c7dbbc
+- **AI-Powered Trip Planning:** Generate personalized itineraries based on your destination, duration, and preferences.
+- **Interactive Map:** Visualize your trip route and discover nearby spots.
+- **Smart Itinerary Optimization:** Automatically optimize your daily routes.
+- **Budget Tracking:** Keep track of your estimated trip expenses.
+- **Social Media Analysis:** Analyze travel inspiration from social media links.
+- **Real-Time Weather:** Get weather forecasts for your destination.
+- **Responsive Design:** Optimized for both mobile and desktop devices.
 
-## Run Locally
+## Getting Started
 
-**Prerequisites:**  Node.js
+1.  Clone the repository.
+2.  Install dependencies: `npm install`.
+3.  Set up your environment variables (see `.env.example`).
+4.  Run the development server: `npm run dev`.
 
+## Technologies
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- React 18+
+- Vite
+- TypeScript
+- Tailwind CSS
+- Firebase (Firestore & Auth)
+- Google Gemini API
+- Leaflet (Maps)
+- Motion (Animations)
