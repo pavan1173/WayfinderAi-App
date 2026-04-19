@@ -317,7 +317,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     }
   };
 
-  const handleAddNearbySpot = (spot: Spot) => {
+  const handleAddNearbySpot = (spot: Spot, day: number) => {
     if (!currentTrip) return;
     
     // Create a new spot object with a guaranteed unique ID for this trip
@@ -329,20 +329,20 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     const updatedTrip = {
       ...currentTrip,
       spots: [...currentTrip.spots, newSpot],
-      itinerary: currentTrip.itinerary.map(day => {
-        if (day.day === activeDay) {
-          return { ...day, spots: [...day.spots, newSpot] };
+      itinerary: currentTrip.itinerary.map(d => {
+        if (d.day === day) {
+          return { ...d, spots: [...d.spots, newSpot] };
         }
-        return { ...day, spots: [...day.spots] };
+        return { ...d, spots: [...d.spots] };
       })
     };
     
-    // Add to activeDay, or create day 1 if empty
-    if (!updatedTrip.itinerary.find(d => d.day === activeDay)) {
+    // Add to requested day, or create day if empty
+    if (!updatedTrip.itinerary.find(d => d.day === day)) {
       if (updatedTrip.itinerary.length > 0) {
         updatedTrip.itinerary[updatedTrip.itinerary.length - 1].spots.push(newSpot);
       } else {
-        updatedTrip.itinerary.push({ day: 1, spots: [newSpot] });
+        updatedTrip.itinerary.push({ day: day, spots: [newSpot] });
       }
     }
     
@@ -350,7 +350,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     if (trips.find(t => t.id === currentTrip.id)) {
       addTrip(updatedTrip);
     }
-    showToast(`Added ${spot.name} to Day ${activeDay}!`);
+    showToast(`Added ${spot.name} to Day ${day}!`);
   };
 
   const handleUpdateSpot = (updatedSpot: Spot) => {
@@ -584,7 +584,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
           nearbySpots={nearbySpots}
           currentDay={activeDay}
           onSpotClick={handleSpotClick}
-          onAddNearbySpot={handleAddNearbySpot}
+          onAddNearbySpot={(spot, day) => handleAddNearbySpot(spot, day)}
           onUpdateSpot={handleUpdateSpot}
           isSidebarOpen={isSidebarOpen}
         />
@@ -1215,7 +1215,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                 {currentTrip && !currentTrip.spots.some(s => s.id === selectedSpot.id) && (
                   <button
                     onClick={() => {
-                      handleAddNearbySpot(selectedSpot);
+                      handleAddNearbySpot(selectedSpot, activeDay);
                       setSelectedSpot(null);
                     }}
                     className="w-full mb-6 py-3 bg-brand text-white font-bold rounded-xl hover:bg-brand/90 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
@@ -1395,7 +1395,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleAddNearbySpot(spot);
+                                    handleAddNearbySpot(spot, activeDay);
                                   }}
                                   className="mt-3 w-full py-1.5 bg-slate-50 text-brand text-[10px] font-bold rounded-lg hover:bg-brand hover:text-white transition-colors flex items-center justify-center gap-1"
                                 >

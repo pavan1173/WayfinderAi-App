@@ -57,7 +57,7 @@ interface MapViewProps {
   nearbySpots?: Spot[];
   currentDay?: number;
   onSpotClick?: (spot: Spot) => void;
-  onAddNearbySpot?: (spot: Spot) => void;
+  onAddNearbySpot?: (spot: Spot, day: number) => void;
   onSpotDragEnd?: (spot: Spot, lat: number, lng: number) => void;
   onUpdateSpot?: (spot: Spot) => void;
   isSidebarOpen?: boolean;
@@ -338,15 +338,23 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
                   <div className="font-bold text-lg">{spot.name}</div>
                   <div className="text-sm text-slate-600">{spot.category}</div>
                   {onAddNearbySpot && (
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAddNearbySpot(spot);
-                      }}
-                      className="bg-brand text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-brand/90 transition-colors w-full text-center"
-                    >
-                      Add to {currentDay ? `Day ${currentDay}` : 'Current Day'}
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <p className="text-xs font-semibold text-slate-500">Add to:</p>
+                      <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                        {[...Array(10)].map((_, i) => (
+                           <button 
+                             key={i}
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               onAddNearbySpot(spot, i + 1);
+                             }}
+                             className="bg-brand text-white px-2 py-1 rounded text-xs font-medium hover:bg-brand/90 transition-colors whitespace-nowrap"
+                           >
+                             Day {i + 1}
+                           </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </Popup>
