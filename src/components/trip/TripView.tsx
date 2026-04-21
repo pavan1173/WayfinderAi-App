@@ -1043,7 +1043,12 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                     </button>
                   </div>
                   {tripSummary && <p className="text-sm text-slate-600 mb-4">{tripSummary}</p>}
-                  <BudgetVisualization />
+                  <BudgetVisualization data={React.useMemo(() => [
+                    { name: 'Attractions', value: currentTrip.spots.filter(s => s.category === 'Landmark').length * 50 + 100 },
+                    { name: 'Food', value: currentTrip.spots.filter(s => s.category === 'Restaurant').length * 30 + 150 },
+                    { name: 'Transportation', value: 200 },
+                    { name: 'Others', value: 100 },
+                  ], [currentTrip.spots])} />
                   <TripRhythmVisualization />
                   <SpotDiversityVisualization />
                   <div className="flex items-center gap-3 mb-4">

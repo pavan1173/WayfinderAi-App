@@ -1,16 +1,9 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
-const data = [
-  { name: 'Flights', value: 400 },
-  { name: 'Hotels', value: 300 },
-  { name: 'Food', value: 300 },
-  { name: 'Activities', value: 200 },
-];
-
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
 
-export const BudgetVisualization = () => {
+export const BudgetVisualization = ({ data }: { data: { name: string; value: number }[] }) => {
   return (
     <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 shadow-sm">
       <h3 className="font-bold text-lg text-slate-900 mb-4">Budget Breakdown</h3>

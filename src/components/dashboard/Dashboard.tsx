@@ -53,20 +53,20 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   };
 
   // Filter and sort trips
-  const filteredTrips = trips
+  const filteredTrips = React.useMemo(() => trips
     .filter(trip => trip.destination.toLowerCase().includes(tripFilter.toLowerCase()))
     .sort((a, b) => {
       if (tripSort === 'name') return a.destination.localeCompare(b.destination);
       return (b.dates || '').localeCompare(a.dates || ''); // Simple date sort
-    });
+    }), [trips, tripFilter, tripSort]);
 
   // Filter and sort savedSpots
-  const filteredSpots = savedSpots
+  const filteredSpots = React.useMemo(() => savedSpots
     .filter(spot => spot.category.toLowerCase().includes(spotFilter.toLowerCase()))
     .sort((a, b) => {
       if (spotSort === 'name') return a.name.localeCompare(b.name);
       return a.category.localeCompare(b.category);
-    });
+    }), [savedSpots, spotFilter, spotSort]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
