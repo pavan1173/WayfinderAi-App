@@ -1,11 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapContainer, TileLayer, Marker, useMap, Polyline, Circle, LayersControl, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap, Polyline, Circle, LayersControl, Popup, useMapEvent } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-control-geocoder/dist/Control.Geocoder.css';
+import 'leaflet-control-geocoder';
 import { Spot, geminiService } from '../../services/geminiService';
-import { ArrowUp, X } from 'lucide-react';
+import { ArrowUp, X, MapPin as MapPinIcon, Search } from 'lucide-react';
 
 // Fix for default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -14,6 +16,17 @@ L.Icon.Default.mergeOptions({
     iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+const GeocoderControl = () => {
+    const map = useMap();
+    useEffect(() => {
+        const geocoder = (L as any).Control.geocoder({
+            defaultMarkGeocode: true
+        }).addTo(map);
+        return () => { map.removeControl(geocoder); };
+    }, [map]);
+    return null;
+};
 
 // Custom Numbered Icon Generator
 const createNumberedIcon = (number: number, color: string = '#3B82F6', isNearby: boolean = false, isActive: boolean = false, customIconUrl?: string) => {
@@ -65,14 +78,20 @@ interface MapViewProps {
 
 const MapController = ({ 
   activeSpot, 
-  spots 
+  spots,
+  mapRef
 }: { 
   activeSpot: Spot | null | undefined, 
-  spots: Spot[] 
+  spots: Spot[],
+  mapRef: React.RefObject<L.Map>
 }) => {
   const map = useMap();
   
   useEffect(() => {
+    if (mapRef) {
+        mapRef.current = map;
+    }
+    
     if (activeSpot && activeSpot.lat !== undefined && activeSpot.lng !== undefined) {
       // Zoom to specific spot
       map.flyTo([activeSpot.lat, activeSpot.lng], 17, {
@@ -95,7 +114,7 @@ const MapController = ({
         });
       }
     }
-  }, [activeSpot, spots, map]);
+  }, [activeSpot, spots, map, mapRef]);
   
   return null;
 };
@@ -112,11 +131,33 @@ const ResizeHandler = ({ isSidebarOpen }: { isSidebarOpen?: boolean }) => {
   return null;
 };
 
+const CenterMapButton = ({ onClick }: { onClick: () => void }) => (
+  <button
+    onClick={onClick}
+    className="absolute top-20 right-4 z-[1000] p-2 bg-white rounded-full shadow-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+    title="Recenter Map"
+  >
+    <MapPinIcon size={20} className="text-brand" />
+  </button>
+);
+
 export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalActiveSpot, showRoute, orderedSpots, nearbySpots = [], currentDay, onSpotClick, onAddNearbySpot, onSpotDragEnd, onUpdateSpot, isSidebarOpen }) => {
   const [localActiveSpot, setLocalActiveSpot] = React.useState<Spot | null>(null);
   const [spotDetails, setSpotDetails] = React.useState<{ openingHours: string, reviews: string[], insights: string } | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = React.useState(false);
   const activeSpot = externalActiveSpot || localActiveSpot;
+  const mapRef = React.useRef<L.Map>(null);
+  
+  const recenterMap = () => {
+    if (mapRef.current && validSpots.length > 0) {
+      if (validSpots.length === 1) {
+        mapRef.current.flyTo([validSpots[0].lat!, validSpots[0].lng!], 14);
+      } else {
+        const bounds = L.latLngBounds(validSpots.map(s => [s.lat!, s.lng!]));
+        mapRef.current.flyToBounds(bounds, { padding: [80, 80], maxZoom: 14 });
+      }
+    }
+  };
 
   const handleSpotClick = async (spot: Spot) => {
     setLocalActiveSpot(spot);
@@ -222,7 +263,10 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
         zoom={13} 
         style={{ height: '100%', width: '100%', zIndex: 1 }}
         scrollWheelZoom={true}
+        whenReady={() => {}}
       >
+        <GeocoderControl />
+        <MapController activeSpot={activeSpot} spots={validSpots} mapRef={mapRef} />
         <ResizeHandler isSidebarOpen={isSidebarOpen} />
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Standard">
@@ -238,6 +282,8 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
             />
           </LayersControl.BaseLayer>
         </LayersControl>
+        
+        <CenterMapButton onClick={recenterMap} />
 
         {showRoute && routePositions.length > 1 && (
           <>
@@ -362,7 +408,7 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
           ))}
         </MarkerClusterGroup>
 
-        <MapController activeSpot={activeSpot} spots={validSpots} />
+        <MapController activeSpot={activeSpot} spots={validSpots} mapRef={mapRef} />
       </MapContainer>
 
       {/* Detail Panel */}
