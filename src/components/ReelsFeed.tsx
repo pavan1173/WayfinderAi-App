@@ -24,7 +24,13 @@ export const ReelsFeed = ({ posts, onClose }: { posts: Reel[], onClose: () => vo
   const containerRef = useRef<HTMLDivElement>(null);
   const { savedReels, toggleSavedReel, addSavedSpots } = useApp();
   const { showToast } = useToast();
+  const [errorStates, setErrorStates] = useState<Record<string, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  const handleImageError = (id: string, e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/travel/600/800';
+    setErrorStates(prev => ({ ...prev, [id]: true }));
+  };
 
   const handleSaveLocation = async (location: string) => {
     setIsSaving(true);
@@ -64,12 +70,20 @@ export const ReelsFeed = ({ posts, onClose }: { posts: Reel[], onClose: () => vo
       <div ref={containerRef} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar">
         {posts.map((post) => (
           <div key={post.id} className="h-full w-full snap-start relative" onClick={() => handleTap(post)}>
-            <img 
-              src={post.image} 
-              className="w-full h-full object-cover" 
-              referrerPolicy="no-referrer" 
-              onError={(e) => { (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/travel/600/800'; }}
-            />
+            <div className="w-full h-full relative">
+              <img 
+                src={post.image} 
+                className="w-full h-full object-cover" 
+                referrerPolicy="no-referrer" 
+                onError={(e) => handleImageError(post.id, e)}
+              />
+              {errorStates[post.id] && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/50 backdrop-blur-sm text-white">
+                  <Video size={48} className="mb-2 opacity-50" />
+                  <p className="text-sm font-semibold uppercase tracking-widest opacity-70">Content Unavailable</p>
+                </div>
+              )}
+            </div>
             {isDoubleTapping && (
               <motion.div 
                 initial={{ scale: 0, opacity: 0 }}

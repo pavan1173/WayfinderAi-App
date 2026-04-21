@@ -431,43 +431,38 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
                 <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
               </div>
             ) : spotDetails ? (
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900">Opening Hours</h4>
-                  <p className="text-sm text-slate-600">{spotDetails.openingHours}</p>
+              <div className="space-y-6">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 mb-2">Opening Hours</h4>
+                  <p className="text-sm text-slate-800 font-medium">{spotDetails.openingHours}</p>
                 </div>
+                
                 <div>
-                  <h4 className="font-bold text-sm text-slate-900">AI Insights</h4>
-                  <p className="text-sm text-slate-600">{spotDetails.insights}</p>
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 mb-2">AI Insights</h4>
+                  <p className="text-sm text-slate-700 leading-relaxed bg-brand/5 p-4 rounded-xl">{spotDetails.insights}</p>
                 </div>
+                
                 <div>
-                  <h4 className="font-bold text-sm text-slate-900">Reviews</h4>
-                  <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 mb-2">Top Reviews</h4>
+                  <div className="space-y-3">
                     {spotDetails.reviews.slice(0, 3).map((review, i) => (
-                      <li key={i} className="line-clamp-2">{review}</li>
-                    ))}
-                  </ul>
-                </div>
-                {/* Custom Icon Section */}
-                <div className="mt-6 border-t pt-4">
-                  <h4 className="font-bold text-sm text-slate-900 mb-2">Marker Icon</h4>
-                  <div className="flex gap-2 mb-2">
-                    {['https://cdn-icons-png.flaticon.com/512/684/684908.png', 'https://cdn-icons-png.flaticon.com/512/684/684909.png'].map(iconUrl => (
-                      <button key={iconUrl} onClick={() => onUpdateSpot && onUpdateSpot({...activeSpot, markerIcon: iconUrl})} className="w-10 h-10 border rounded-lg overflow-hidden">
-                        <img src={iconUrl} className="w-full h-full object-cover" />
-                      </button>
+                      <div key={i} className="flex gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                        <span className="text-amber-400">"</span>
+                        <p className="line-clamp-2">{review}</p>
+                      </div>
                     ))}
                   </div>
-                  <input 
-                    type="text" 
-                    placeholder="Or paste icon URL" 
-                    className="w-full text-sm p-2 border rounded-lg"
-                    onChange={(e) => onUpdateSpot && onUpdateSpot({...activeSpot, markerIcon: e.target.value})}
-                  />
                 </div>
+
+                <button 
+                  onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeSpot.name)}`, '_blank')}
+                  className="w-full py-3 bg-brand text-white font-bold rounded-xl hover:bg-brand/90 transition-colors shadow-lg shadow-brand/20"
+                >
+                  Get Directions
+                </button>
               </div>
             ) : (
-              <p className="text-sm text-slate-500">Details not available.</p>
+                <p className="text-sm text-slate-500">Details not available.</p>
             )}
           </motion.div>
         )}

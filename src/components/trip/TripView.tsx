@@ -561,6 +561,13 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
   };
 
   const dragControls = useDragControls();
+  
+  const budgetData = React.useMemo(() => [
+    { name: 'Attractions', value: currentTrip.spots.filter(s => s.category === 'Landmark').length * 50 + 100 },
+    { name: 'Food', value: currentTrip.spots.filter(s => s.category === 'Restaurant').length * 30 + 150 },
+    { name: 'Transportation', value: 200 },
+    { name: 'Others', value: 100 },
+  ], [currentTrip.spots]);
 
   if (!currentTrip) return null;
 
@@ -594,6 +601,16 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
             <ChevronLeft size={24} />
           </button>
           <div className="flex gap-2">
+            <button 
+              onClick={handleSaveTrip}
+              disabled={isSaved}
+              className={cn(
+                "w-10 h-10 rounded-full shadow-lg flex items-center justify-center font-bold text-sm transition-colors",
+                isSaved ? "bg-emerald-500 text-white" : "bg-white text-slate-900"
+              )}
+            >
+              {isSaved ? <Check size={16} /> : <Save size={16} />}
+            </button>
             {isEditing ? (
               <>
                 <button onClick={handleSave} className="px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm bg-brand text-white">
@@ -1043,12 +1060,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                     </button>
                   </div>
                   {tripSummary && <p className="text-sm text-slate-600 mb-4">{tripSummary}</p>}
-                  <BudgetVisualization data={React.useMemo(() => [
-                    { name: 'Attractions', value: currentTrip.spots.filter(s => s.category === 'Landmark').length * 50 + 100 },
-                    { name: 'Food', value: currentTrip.spots.filter(s => s.category === 'Restaurant').length * 30 + 150 },
-                    { name: 'Transportation', value: 200 },
-                    { name: 'Others', value: 100 },
-                  ], [currentTrip.spots])} />
+                  <BudgetVisualization data={budgetData} />
                   <TripRhythmVisualization />
                   <SpotDiversityVisualization />
                   <div className="flex items-center gap-3 mb-4">
