@@ -148,6 +148,9 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
   const activeSpot = externalActiveSpot || localActiveSpot;
   const mapRef = React.useRef<L.Map>(null);
   
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [isSearching, setIsSearching] = React.useState(false);
+
   const recenterMap = () => {
     if (mapRef.current && validSpots.length > 0) {
       if (validSpots.length === 1) {
@@ -156,6 +159,24 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
         const bounds = L.latLngBounds(validSpots.map(s => [s.lat!, s.lng!]));
         mapRef.current.flyToBounds(bounds, { padding: [80, 80], maxZoom: 14 });
       }
+    }
+  };
+
+  const handleGeminiSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    try {
+      const spots = await geminiService.extractSpotsFromText(searchQuery);
+      if (spots.length > 0 && spots[0].lat && spots[0].lng) {
+        mapRef.current?.flyTo([spots[0].lat, spots[0].lng], 14, { duration: 1.5 });
+      } else {
+        // Fallback to geocoder if Gemini doesn't return lat/lng
+        console.log("Gemini couldn't find coordinates, trying geocoder...");
+      }
+    } catch (e) {
+      console.error("Search failed", e);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -247,8 +268,21 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
       </style>
       
       {/* Floating UI Overlay */}
+      <div className="absolute top-4 left-4 right-20 z-[1000] flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+              <input 
+                type="text"
+                placeholder="Search location via AI..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleGeminiSearch()}
+                className="w-full pl-9 pr-4 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/20 outline-none focus:ring-2 focus:ring-brand"
+              />
+            </div>
+      </div>
       <div className="absolute top-4 right-4 z-[1000] flex items-center gap-2 pointer-events-none">
-        <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg border border-white/20">
+        <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg border border-white/20 pointer-events-auto">
           <div className="flex items-center gap-1 text-slate-600">
             <ArrowUp size={16} />
             <span className="font-bold text-slate-800">{validSpots.length}</span>

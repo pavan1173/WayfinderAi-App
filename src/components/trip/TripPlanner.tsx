@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ChevronLeft, Calendar, Check, Sparkles, MapPin, Clock, Info, Zap } from 'lucide-react';
+import { Search, ChevronLeft, Calendar, Check, Sparkles, MapPin, Clock, Info, Zap, X } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useToast } from '../../store/ToastContext';
 import { geminiService, Spot, Trip } from '../../services/geminiService';
@@ -392,6 +392,28 @@ export const TripPlanner = ({ onClose, initialDestination = '', initialSpots, in
                 </button>
               </div>
               <div className="space-y-4">
+                {selectedSpots.length > 0 && (
+                  <div className="mb-6 bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-700 mb-3 ml-1">Selected ({selectedSpots.length})</h3>
+                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                      {availableSpots.filter(s => selectedSpots.includes(s.id)).map(spot => (
+                        <div key={`selected-${spot.id}`} className="relative flex-shrink-0 w-20 group">
+                          <img src={spot.imageUrl} className="w-20 h-20 rounded-2xl object-cover shadow-sm" referrerPolicy="no-referrer" />
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedSpots(prev => prev.filter(id => id !== spot.id));
+                            }}
+                            className="absolute -top-1 -right-1 bg-white p-1 rounded-full shadow-md text-red-500 hover:bg-red-50"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {availableSpots.map(spot => (
                   <motion.div 
                     key={spot.id}
