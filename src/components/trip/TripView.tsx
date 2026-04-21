@@ -1397,16 +1397,23 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                               <div className="p-3">
                                 <div className="font-bold text-sm text-slate-800 truncate">{spot.name}</div>
                                 <div className="text-[10px] text-slate-400 font-medium uppercase mt-0.5">{spot.category}</div>
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAddNearbySpot(spot, activeDay);
-                                  }}
-                                  className="mt-3 w-full py-1.5 bg-slate-50 text-brand text-[10px] font-bold rounded-lg hover:bg-brand hover:text-white transition-colors flex items-center justify-center gap-1"
-                                >
-                                  <Plus size={10} />
-                                  Add to Day {activeDay}
-                                </button>
+                                <div className="mt-3 flex flex-col gap-1">
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase">Add to Day:</p>
+                                  <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                                    {[...Array(10)].map((_, i) => (
+                                      <button 
+                                        key={i}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleAddNearbySpot(spot, i + 1);
+                                        }}
+                                        className="bg-brand text-white px-2 py-1 rounded text-[10px] font-medium hover:bg-brand/90 transition-colors whitespace-nowrap"
+                                      >
+                                        {i + 1}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           ))
