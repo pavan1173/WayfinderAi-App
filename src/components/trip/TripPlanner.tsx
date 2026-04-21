@@ -281,23 +281,39 @@ export const TripPlanner = ({ onClose, initialDestination = '', initialSpots, in
                     </button>
                   </div>
 
-                  <div className="flex flex-col items-center gap-8">
-                    <div className="flex items-center gap-6">
-                      <button 
-                        onClick={() => setDuration(Math.max(1, duration - 1))}
-                        className="w-12 h-12 rounded-full border-2 border-slate-200 flex items-center justify-center text-2xl font-bold text-slate-400"
-                      >
-                        -
-                      </button>
-                      <div className="text-6xl font-display font-bold text-slate-900">{duration}</div>
-                      <button 
-                        onClick={() => setDuration(duration + 1)}
-                        className="w-12 h-12 rounded-full border-2 border-slate-200 flex items-center justify-center text-2xl font-bold text-slate-400"
-                      >
-                        +
-                      </button>
+                  <div className="relative w-full h-48 overflow-hidden flex justify-center items-center bg-white rounded-3xl border border-slate-200 shadow-sm">
+                    {/* Active Highlight Marker */}
+                    <div className="absolute w-28 h-14 border-t border-b border-brand rounded-xl pointer-events-none bg-slate-900/5 shadow-[0_0_20px_rgba(0,0,0,0.1)]" />
+                    
+                    <div 
+                      className="w-full snap-y snap-mandatory overflow-y-auto h-48 py-16 scrollbar-hide"
+                      style={{
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none',
+                      }}
+                      onScrollEnd={(e) => {
+                        const scrollY = e.currentTarget.scrollTop;
+                        const newDuration = Math.round(scrollY / 64) + 1;
+                        if (newDuration !== duration) setDuration(newDuration);
+                      }}
+                    >
+                      <style>{`.scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
+                      {[...Array(30)].map((_, i) => {
+                        const day = i + 1;
+                        const isSelected = day === duration;
+                        return (
+                          <div
+                            key={day}
+                            className={cn(
+                              "h-16 flex items-center justify-center text-4xl font-bold snap-center transition-all duration-300",
+                              isSelected ? "text-slate-900 scale-125" : "text-slate-300 scale-75"
+                            )}
+                          >
+                            {day}
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="text-slate-400 font-medium">Days</div>
                   </div>
                   <button 
                     onClick={handleDurationSubmit}
