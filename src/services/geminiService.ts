@@ -702,6 +702,59 @@ export const geminiService = {
     }
   },
 
+  async getAllNearbyPlaces(lat: number, lng: number): Promise<Spot[]> {
+    try {
+      // Searching for all types of places
+      const response = await withRetry(() => ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Find hotels, restaurants, and top tourist attractions near Lat: ${lat}, Lng: ${lng}. Return as a JSON array with name, description, category, lat, lng.`,
+        config: {
+          tools: [{ googleMaps: {} }],
+          toolConfig: {
+            retrievalConfig: {
+              latLng: { latitude: lat, longitude: lng }
+            }
+          }
+        },
+      }));
+
+      const infoText = response.text;
+
+      const structuredResponse = await withRetry(() => ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Text: ${infoText}`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING },
+                description: { type: Type.STRING },
+                category: { type: Type.STRING },
+                lat: { type: Type.NUMBER },
+                lng: { type: Type.NUMBER },
+              },
+              required: ["name", "description", "category", "lat", "lng"],
+            },
+          },
+        },
+      }));
+
+      const spots = JSON.parse(structuredResponse.text);
+      return Promise.all(spots.map(async (s: any) => ({
+        ...s,
+        id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36).substr(-4),
+        imageUrl: await getWikipediaImage(s.name),
+        markerIcon: s.category.toLowerCase().includes('hotel') ? 'https://cdn-icons-png.flaticon.com/512/2953/2953372.png' : 
+                    s.category.toLowerCase().includes('restaurant') ? 'https://cdn-icons-png.flaticon.com/512/1996/1996582.png' : undefined 
+      })));
+    } catch (e) {
+      return handleGeminiError(e, [], "getting all nearby places");
+    }
+  },
+
   async getNearbySpots(lat: number, lng: number, category?: string): Promise<Spot[]> {
     try {
       // Step 1: Get information using Google Maps grounding with explicit location

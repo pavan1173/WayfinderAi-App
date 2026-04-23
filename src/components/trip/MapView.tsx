@@ -150,6 +150,22 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
   
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearching, setIsSearching] = React.useState(false);
+  const [allNearbyPlaces, setAllNearbyPlaces] = React.useState<Spot[]>([]);
+
+  const spotsToRender = orderedSpots && orderedSpots.length > 0 ? orderedSpots : spots;
+  const validSpots = spotsToRender.filter(s => s.lat !== undefined && s.lng !== undefined);
+
+  useEffect(() => {
+    // Load all nearby places when map initializes or spot changes
+    if (validSpots.length > 0) {
+      const centralSpot = validSpots[0];
+      if (centralSpot.lat && centralSpot.lng) {
+        geminiService.getAllNearbyPlaces(centralSpot.lat, centralSpot.lng)
+          .then(places => setAllNearbyPlaces(places))
+          .catch(console.error);
+      }
+    }
+  }, [JSON.stringify(validSpots.map(s => s.id))]);
 
   const recenterMap = () => {
     if (mapRef.current && validSpots.length > 0) {
@@ -197,9 +213,6 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
     }
   };
 
-  const spotsToRender = orderedSpots && orderedSpots.length > 0 ? orderedSpots : spots;
-  const validSpots = spotsToRender.filter(s => s.lat !== undefined && s.lng !== undefined);
-  
   if (validSpots.length === 0) {
     return (
       <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400 font-medium">
@@ -397,19 +410,16 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
 
         {/* Nearby Spots */}
         <MarkerClusterGroup>
-          {nearbySpots.map((spot, index) => (
+          {[...nearbySpots, ...allNearbyPlaces].filter((s, index, self) => 
+            index === self.findIndex((t) => t.id === s.id)
+          ).map((spot, index) => (
             <Marker 
               key={`nearby-spot-${spot.id}-${index}`} 
               position={[spot.lat!, spot.lng!]}
-              icon={createNumberedIcon(0, '#F59E0B', true, activeSpot?.id === spot.id)}
-              draggable={true}
+              icon={createNumberedIcon(0, '#F59E0B', true, activeSpot?.id === spot.id, spot.markerIcon)}
+              draggable={false}
               eventHandlers={{
                 click: () => handleSpotClick(spot),
-                dragend: (e) => {
-                  const marker = e.target;
-                  const position = marker.getLatLng();
-                  console.log('New position:', position);
-                }
               }}
               zIndexOffset={activeSpot?.id === spot.id ? 1000 : -100}
             >
@@ -428,7 +438,7 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
                                e.stopPropagation();
                                onAddNearbySpot(spot, i + 1);
                              }}
-                             className="bg-brand text-white px-2 py-1 rounded text-xs font-medium hover:bg-brand/90 transition-colors whitespace-nowrap"
+                             className="bg-brand text-white px-2 py-1 rounded text-xs font-medium hover:bg-brand/90 transition-none whitespace-nowrap"
                            >
                              Day {i + 1}
                            </button>
