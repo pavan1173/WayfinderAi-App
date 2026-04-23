@@ -602,32 +602,46 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
             <ChevronLeft size={24} />
           </button>
           <div className="flex gap-2">
-            <button 
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={handleSaveTrip}
               disabled={isSaved}
               className={cn(
                 "w-10 h-10 rounded-full shadow-lg flex items-center justify-center font-bold text-sm transition-colors",
-                isSaved ? "bg-emerald-500 text-white" : "bg-white text-slate-900"
+                isSaved ? "bg-emerald-500 text-white" : "bg-white text-slate-900 hover:bg-slate-50"
               )}
             >
               {isSaved ? <Check size={16} /> : <Save size={16} />}
-            </button>
+            </motion.button>
             {isEditing ? (
               <>
-                <button onClick={handleSave} className="px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm bg-brand text-white">
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleSave} 
+                  className="px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm bg-brand text-white hover:bg-brand-dark"
+                >
                   <Check size={16} /> Save
-                </button>
-                <button onClick={handleCancel} className="px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm bg-white text-slate-900">
+                </motion.button>
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleCancel} 
+                  className="px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm bg-white text-slate-900 hover:bg-slate-50"
+                >
                   <X size={16} /> Cancel
-                </button>
+                </motion.button>
               </>
             ) : (
-              <button 
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleToggleEdit}
-                className="px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm bg-white text-slate-900"
+                className="px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-bold text-sm bg-white text-slate-900 hover:bg-slate-50"
               >
                 <Edit2 size={16} /> Edit
-              </button>
+              </motion.button>
             )}
           </div>
         </div>

@@ -1,13 +1,24 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapContainer, TileLayer, Marker, useMap, Polyline, Circle, LayersControl, Popup, useMapEvent } from 'react-leaflet';
+import { 
+  MapContainer, 
+  TileLayer, 
+  Marker, 
+  useMap, 
+  Polyline, 
+  Circle, 
+  LayersControl, 
+  Popup,
+  ScaleControl,
+  ZoomControl
+} from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-control-geocoder/dist/Control.Geocoder.css';
 import 'leaflet-control-geocoder';
 import { Spot, geminiService } from '../../services/geminiService';
-import { ArrowUp, X, MapPin as MapPinIcon, Search } from 'lucide-react';
+import { ArrowUp, X, MapPin as MapPinIcon, Search, Navigation } from 'lucide-react';
 
 // Fix for default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -134,7 +145,7 @@ const ResizeHandler = ({ isSidebarOpen }: { isSidebarOpen?: boolean }) => {
 const CenterMapButton = ({ onClick }: { onClick: () => void }) => (
   <button
     onClick={onClick}
-    className="absolute top-20 right-4 z-[1000] p-2 bg-white rounded-full shadow-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+    className="p-3 bg-white rounded-full shadow-lg border border-slate-200 hover:bg-slate-50 transition-colors"
     title="Recenter Map"
   >
     <MapPinIcon size={20} className="text-brand" />
@@ -310,27 +321,36 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
         zoom={13} 
         style={{ height: '100%', width: '100%', zIndex: 1 }}
         scrollWheelZoom={true}
-        whenReady={() => {}}
+        zoomControl={false}
       >
+        <ZoomControl position="bottomright" />
+        <ScaleControl position="bottomleft" imperial={false} />
         <GeocoderControl />
         <MapController activeSpot={activeSpot} spots={validSpots} mapRef={mapRef} />
         <ResizeHandler isSidebarOpen={isSidebarOpen} />
-        <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Standard">
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-            />
-          </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="Satellite">
-            <TileLayer
-              attribution='&copy; <a href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}">Esri</a>'
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            />
-          </LayersControl.BaseLayer>
-        </LayersControl>
         
-        <CenterMapButton onClick={recenterMap} />
+        {/* Map Controls */}
+        <div className="absolute bottom-8 left-4 z-[1000] flex flex-col gap-2">
+            <CenterMapButton onClick={recenterMap} />
+        </div>
+        
+        {/* Layer control moved to bottom right along with zoom control */}
+        <div className="absolute bottom-8 right-16 z-[1000]">
+           <LayersControl position="bottomright">
+             <LayersControl.BaseLayer checked name="Standard">
+               <TileLayer
+                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                 url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+               />
+             </LayersControl.BaseLayer>
+             <LayersControl.BaseLayer name="Satellite">
+               <TileLayer
+                 attribution='&copy; <a href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}">Esri</a>'
+                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+               />
+             </LayersControl.BaseLayer>
+           </LayersControl>
+        </div>
 
         {showRoute && routePositions.length > 1 && (
           <>
