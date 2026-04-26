@@ -9,6 +9,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(express.json());
+
   // API routes FIRST
   app.get("/api/weather", async (req, res) => {
     const { lat, lon } = req.query;
@@ -23,6 +25,24 @@ async function startServer() {
       res.json(data);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch weather" });
+    }
+  });
+
+  app.post("/api/gemini", async (req, res) => {
+    const { prompt, model = "gemini-2.5-flash" } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ error: "Missing prompt" });
+    }
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to call Gemini" });
     }
   });
 
