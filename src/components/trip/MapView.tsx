@@ -152,7 +152,7 @@ const CenterMapButton = ({ onClick }: { onClick: () => void }) => (
   </button>
 );
 
-export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalActiveSpot, showRoute, orderedSpots, nearbySpots = [], currentDay, onSpotClick, onAddNearbySpot, onSpotDragEnd, onUpdateSpot, isSidebarOpen }) => {
+export const MapView: React.FC<MapViewProps> = React.memo(({ spots, activeSpot: externalActiveSpot, showRoute, orderedSpots, nearbySpots = [], currentDay, onSpotClick, onAddNearbySpot, onSpotDragEnd, onUpdateSpot, isSidebarOpen }) => {
   const [localActiveSpot, setLocalActiveSpot] = React.useState<Spot | null>(null);
   const [spotDetails, setSpotDetails] = React.useState<{ openingHours: string, reviews: string[], insights: string } | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = React.useState(false);
@@ -533,4 +533,4 @@ export const MapView: React.FC<MapViewProps> = ({ spots, activeSpot: externalAct
       </AnimatePresence>
     </div>
   );
-};
+});

@@ -250,7 +250,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     }
   };
 
-  const handleSpotClick = async (spot: Spot) => {
+  const handleSpotClick = React.useCallback(async (spot: Spot) => {
     setSelectedSpot(spot);
     setSpotDetails({});
     setFastInfo(null);
@@ -263,31 +263,36 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     // Get fast info first
     const queryName = currentTrip ? `${spot.name} in ${currentTrip.destination}` : spot.name;
     
-    geminiService.getFastSpotInfo(queryName).then(info => {
-      setFastInfo(info);
-      setIsGettingFastInfo(false);
-    }).catch(() => setIsGettingFastInfo(false));
+    // Run independent fetches in parallel
+    const [fastInfoRes, spotDetailsRes, savedSpotDetailsRes] = await Promise.allSettled([
+      geminiService.getFastSpotInfo(queryName),
+      currentTrip ? geminiService.getSpotDetails(spot.name, currentTrip.destination) : Promise.reject('No trip'),
+      geminiService.getSpotDetails(queryName, currentTrip?.destination || '')
+    ]);
 
-    // Get spot details
-    if (currentTrip) {
-      geminiService.getSpotDetails(spot.name, currentTrip.destination).then(details => {
-        setSpotDetails(details);
-        setIsGettingSpotPlan(false);
-      }).catch(() => setIsGettingSpotPlan(false));
+    if (fastInfoRes.status === 'fulfilled') {
+      setFastInfo(fastInfoRes.value);
+    }
+    setIsGettingFastInfo(false);
+
+    if (spotDetailsRes.status === 'fulfilled') {
+      setSpotDetails(spotDetailsRes.value);
+      setIsGettingSpotPlan(false);
     } else {
       setIsGettingSpotPlan(false);
     }
 
-    // Get saved spot details (basic details, new things, upcoming events)
-    geminiService.getSpotDetails(queryName, currentTrip?.destination || '').then(details => {
+    if (savedSpotDetailsRes.status === 'fulfilled') {
       setSavedSpotDetails({
-        shortDescription: details.insights,
+        shortDescription: savedSpotDetailsRes.value.insights,
         keywords: [],
-        newThings: details.openingHours,
-        upcomingEvents: details.reviews.join(', ')
+        newThings: savedSpotDetailsRes.value.openingHours,
+        upcomingEvents: savedSpotDetailsRes.value.reviews.join(', ')
       });
       setIsGettingSavedSpotDetails(false);
-    }).catch(() => setIsGettingSavedSpotDetails(false));
+    } else {
+      setIsGettingSavedSpotDetails(false);
+    }
 
     // Then get full maps details
     try {
@@ -316,9 +321,9 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     } catch (e) {
       console.error("Failed to get spot details", e);
     }
-  };
+  }, [currentTrip]);
 
-  const handleAddNearbySpot = (spot: Spot, day: number) => {
+  const handleAddNearbySpot = React.useCallback((spot: Spot, day: number) => {
     if (!currentTrip) return;
     
     // Create a new spot object with a guaranteed unique ID for this trip
@@ -352,9 +357,9 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
       addTrip(updatedTrip);
     }
     showToast(`Added ${spot.name} to Day ${day}!`);
-  };
+  }, [currentTrip, trips, addTrip, setCurrentTrip, showToast]);
 
-  const handleUpdateSpot = (updatedSpot: Spot) => {
+  const handleUpdateSpot = React.useCallback((updatedSpot: Spot) => {
     if (!currentTrip) return;
     const newSpots = currentTrip.spots.map(s => s.id === updatedSpot.id ? updatedSpot : s);
     const newItinerary = currentTrip.itinerary.map(day => ({
@@ -365,7 +370,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
     if (trips.find(t => t.id === currentTrip.id)) {
       addTrip({ ...currentTrip, spots: newSpots, itinerary: newItinerary });
     }
-  };
+  }, [currentTrip, trips, addTrip, setCurrentTrip]);
 
   const handleShare = async () => {
     if (!currentTrip) return;

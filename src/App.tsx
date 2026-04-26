@@ -11,12 +11,24 @@ import { Plus } from 'lucide-react';
 import { Spot } from './services/geminiService';
 
 function AppContent() {
-  const { onboarded, currentTrip, setCurrentTrip } = useApp();
+  const { onboarded, currentTrip, setCurrentTrip, isAuthReady } = useApp();
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isPlannerOpen, setIsPlannerOpen] = useState(false);
   const [plannerDestination, setPlannerDestination] = useState('');
   const [plannerInitialSpots, setPlannerInitialSpots] = useState<Spot[] | undefined>(undefined);
   const [plannerDuration, setPlannerDuration] = useState<number>(3);
+
+  if (!isAuthReady) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-white">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
 
   if (!onboarded) {
     return <Onboarding />;
@@ -73,10 +85,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <ToastProvider>
+    <ToastProvider>
+      <AppProvider>
         <AppContent />
-      </ToastProvider>
-    </AppProvider>
+      </AppProvider>
+    </ToastProvider>
   );
 }

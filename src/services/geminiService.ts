@@ -3,6 +3,10 @@ import { showToast } from '../lib/toast';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+// Cache for nearby spots by lat/lng grid (2 decimal places)
+const nearbySpotsCache = new Map<string, { data: Spot[], timestamp: number }>();
+const CACHE_TTL = 1000 * 60 * 60; // 1 hour
+
 // Helper to handle API errors, specifically rate limits
 async function handleGeminiError<T>(error: any, fallback: T, context: string): Promise<T> {
   let isRateLimit = false;
@@ -136,7 +140,7 @@ export const geminiService = {
   async getTripSummary(trip: Trip): Promise<string> {
     try {
       const response = await withRetry(() => ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `Provide a concise, engaging summary of the following trip: ${JSON.stringify(trip)}. Highlight the key spots and the overall vibe.`,
       }));
       return response.text || "No summary available.";
@@ -149,7 +153,7 @@ export const geminiService = {
   async extractSpotsFromText(text: string): Promise<Spot[]> {
     try {
       const response = await withRetry(() => ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `Extract travel spots from: "${text}". Provide: name, description, category, lat, lng.`,
         config: {
           tools: [{ googleSearch: {} }],
@@ -208,7 +212,7 @@ export const geminiService = {
       const infoText = response.text;
 
       const structuredResponse = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `Extract from text: website, phone, hours, lat, lng. Text: ${infoText}`,
         config: {
           responseMimeType: "application/json",
@@ -328,7 +332,7 @@ export const geminiService = {
     try {
       const tripContext = trip ? `\n\nContext about the user's current trip: ${JSON.stringify(trip)}` : "";
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `${query}${tripContext}`,
         config: {
           tools: [{ googleSearch: {} }],
@@ -756,6 +760,12 @@ export const geminiService = {
   },
 
   async getNearbySpots(lat: number, lng: number, category?: string): Promise<Spot[]> {
+    const cacheKey = `${lat.toFixed(2)}_${lng.toFixed(2)}_${category || 'all'}`;
+    const cached = nearbySpotsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data;
+    }
+
     try {
       // Step 1: Get information using Google Maps grounding with explicit location
       const response = await withRetry(() => ai.models.generateContent({
@@ -775,7 +785,7 @@ export const geminiService = {
 
       // Step 2: Use a fast model to structure the text into JSON
       const structuredResponse = await withRetry(() => ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Ensure the lat/lng are accurate to the location provided. Text: ${infoText}`,
         config: {
           responseMimeType: "application/json",
@@ -800,11 +810,15 @@ export const geminiService = {
       const uniqueSpots = spots.filter((s: any, index: number, self: any[]) => 
         index === self.findIndex((t) => t.name === s.name)
       );
-      return Promise.all(uniqueSpots.map(async (s: any) => ({
+
+      const result = await Promise.all(uniqueSpots.map(async (s: any) => ({
         ...s,
         id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36).substr(-4),
         imageUrl: await getWikipediaImage(s.name),
       })));
+
+      nearbySpotsCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
     } catch (e) {
       return handleGeminiError(e, [], "getting nearby spots");
     }
@@ -899,16 +913,7 @@ export const geminiService = {
   },
 
   async getLocalSocialInspiration(lat: number, lng: number): Promise<any[]> {
-    const cacheKey = `social_inspiration_${lat.toFixed(2)}_${lng.toFixed(2)}`;
     try {
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < 1000 * 60 * 60 * 6) { // 6 hour cache
-          return data;
-        }
-      }
-
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `Find 3 trendy, photogenic travel spots, cafes, or attractions near this location (Lat: ${lat}, Lng: ${lng}).`,
@@ -955,7 +960,6 @@ export const geminiService = {
         imageUrl: s.imageUrl || await getWikipediaImage(s.name),
       })));
 
-      localStorage.setItem(cacheKey, JSON.stringify({ data: result, timestamp: Date.now() }));
       return result;
     } catch (e: any) {
       return handleGeminiError(e, [

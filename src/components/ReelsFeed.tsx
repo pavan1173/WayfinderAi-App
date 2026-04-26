@@ -32,18 +32,19 @@ export const ReelsFeed = ({ posts, onClose }: { posts: Reel[], onClose: () => vo
     setErrorStates(prev => ({ ...prev, [id]: true }));
   };
 
-  const handleSaveLocation = async (location: string) => {
+  const handleSaveLocation = async (post: Reel) => {
     setIsSaving(true);
     try {
-      const spots = await geminiService.extractSpotsFromText(location);
+      const combinedText = `${post.caption} ${post.location}`;
+      const spots = await geminiService.extractSpotsFromText(combinedText);
       if (spots.length > 0) {
         addSavedSpots(spots);
-        showToast(`Saved ${spots[0].name} to your spots!`);
+        showToast(`Saved ${spots.length} spots from this reel to your saved places!`);
       } else {
-        showToast("Could not find a specific spot in this location.");
+        showToast("Could not find any specific spots in this reel.");
       }
     } catch (error) {
-      showToast("Failed to save location.");
+      showToast("Failed to analyze and save places.");
     } finally {
       setIsSaving(false);
     }
@@ -109,7 +110,7 @@ export const ReelsFeed = ({ posts, onClose }: { posts: Reel[], onClose: () => vo
               <div className="flex items-center gap-2 text-white/90 text-sm mb-8 font-medium">
                 <MapPin size={16} /> {post.location}
                 <button 
-                  onClick={() => handleSaveLocation(post.location)}
+                  onClick={() => handleSaveLocation(post)}
                   disabled={isSaving}
                   className="ml-2 bg-white/20 hover:bg-white/30 p-1 rounded-full transition-colors"
                 >
