@@ -2,6 +2,12 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import dotenv from "dotenv";
+import rateLimit from "express-rate-limit";
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
 
 dotenv.config();
 
@@ -10,6 +16,7 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  app.use("/api/", limiter); // Apply to all API routes
 
   // API routes FIRST
   app.get("/api/weather", async (req, res) => {

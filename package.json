@@ -21,6 +21,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.4.1",
     "firebase": "^12.11.0",
     "leaflet": "^1.9.4",
     "leaflet-control-geocoder": "^3.3.1",

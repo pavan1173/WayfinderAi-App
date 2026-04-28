@@ -40,6 +40,12 @@ async function handleGeminiError<T>(error: any, fallback: T, context: string): P
   return fallback;
 }
 
+function sanitizeInput(input: string): string {
+  if (!input) return "";
+  // Basic sanitization: strip HTML tags, limit length
+  return input.replace(/<[^>]*>?/gm, '').substring(0, 5000).trim();
+}
+
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
   try {
     return await fn();
