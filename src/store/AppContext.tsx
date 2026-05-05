@@ -7,14 +7,25 @@ import { useToast } from './ToastContext';
 
 interface AppContextType {
   onboarded: boolean;
-  user: { name: string; avatar: string; bio?: string; uid: string } | null;
+  user: { 
+    name: string; 
+    avatar: string; 
+    bio?: string; 
+    uid: string;
+    preferences?: {
+      travelStyle: string;
+      budget: string;
+      interests: string[];
+    }
+  } | null;
   trips: Trip[];
   savedSpots: Spot[];
   savedReels: string[];
   importHistory: { id: string; destination: string; timestamp: number }[];
   currentTrip: Trip | null;
   setOnboarded: (val: boolean) => void;
-  setUser: (user: { name: string; avatar: string; bio?: string; uid: string } | null) => void;
+  setUser: (user: { name: string; avatar: string; bio?: string; uid: string; preferences?: any } | null) => void;
+  updateUser: (data: Partial<AppContextType['user']>) => Promise<void>;
   addTrip: (trip: Trip) => void;
   deleteTrip: (id: string) => void;
   addSavedSpots: (spots: Spot[]) => void;
@@ -97,6 +108,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateUser = async (data: Partial<AppContextType['user']>) => {
+    if (user) {
+      const updatedUser = { ...user, ...data };
+      setUser(updatedUser);
+      await updateUserDoc(data);
+      showToast('Profile updated successfully');
+    }
+  };
+
   const addTrip = (trip: Trip) => {
     const newTrips = [...trips];
     const index = newTrips.findIndex(t => t.id === trip.id);
@@ -134,7 +154,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{
       onboarded, user, trips, savedSpots, savedReels, importHistory, searchHistory, currentTrip,
-      setOnboarded, setUser, addTrip, deleteTrip, addSavedSpots, toggleSavedReel, addImportHistory, setCurrentTrip, addSearch, isAuthReady, showToast
+      setOnboarded, setUser, updateUser, addTrip, deleteTrip, addSavedSpots, toggleSavedReel, addImportHistory, setCurrentTrip, addSearch, isAuthReady, showToast
     }}>
       {children}
     </AppContext.Provider>

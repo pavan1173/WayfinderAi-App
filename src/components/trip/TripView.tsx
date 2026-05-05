@@ -798,7 +798,7 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
 
         <div ref={scrollContainerRef} onScroll={handleScroll} className={cn("flex-1 overflow-y-auto no-scrollbar px-6 pb-8 scroll-smooth transition-opacity duration-300", isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none")}>
           <AnimatePresence mode="wait">
-            {activeTab === 'overview' ? (
+            {activeTab === 'overview' && (
               <motion.div 
                 key="overview"
                 initial={{ opacity: 0, x: -20 }}
@@ -930,7 +930,9 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                   </div>
                 ))}
               </motion.div>
-            ) : (
+            )}
+
+            {activeTab === 'itinerary' && (
               <motion.div 
                 key="itinerary"
                 initial={{ opacity: 0, x: 20 }}
@@ -1276,8 +1278,8 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                     </div>
                     {isGettingFastInfo ? (
                       <div className="space-y-2">
-                        <div className="h-4 bg-slate-800 rounded w-full animate-pulse" />
-                        <div className="h-4 bg-slate-800 rounded w-5/6 animate-pulse" />
+                        <Skeleton className="h-4 w-full bg-slate-800" />
+                        <Skeleton className="h-4 w-5/6 bg-slate-800" />
                       </div>
                     ) : (
                       <p className="text-sm leading-relaxed font-medium">
@@ -1291,18 +1293,18 @@ export const TripView = ({ trip, onClose }: { trip: Trip, onClose: () => void })
                       <div className="space-y-8">
                         <section>
                           <div className="flex items-center gap-2 mb-3">
-                            <div className="w-8 h-8 bg-slate-100 rounded-full animate-pulse" />
-                            <div className="h-6 bg-slate-200 rounded-lg w-1/3 animate-pulse" />
+                            <Skeleton className="w-8 h-8 rounded-full" />
+                            <Skeleton className="h-6 w-1/3" />
                           </div>
                           <div className="space-y-2 mb-4">
-                            <div className="h-4 bg-slate-100 rounded w-full animate-pulse" />
-                            <div className="h-4 bg-slate-100 rounded w-5/6 animate-pulse" />
-                            <div className="h-4 bg-slate-100 rounded w-4/5 animate-pulse" />
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-5/6" />
+                            <Skeleton className="h-4 w-4/5" />
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <div className="w-16 h-6 bg-slate-100 rounded-full animate-pulse" />
-                            <div className="w-20 h-6 bg-slate-100 rounded-full animate-pulse" />
-                            <div className="w-14 h-6 bg-slate-100 rounded-full animate-pulse" />
+                            <Skeleton className="w-16 h-6 rounded-full" />
+                            <Skeleton className="w-20 h-6 rounded-full" />
+                            <Skeleton className="w-14 h-6 rounded-full" />
                           </div>
                         </section>
                         <section>

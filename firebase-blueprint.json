@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and travel data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "avatar": { "type": "string" },
+        "bio": { "type": "string" },
+        "onboarded": { "type": "boolean" },
+        "preferences": {
+          "type": "object",
+          "properties": {
+            "travelStyle": { "type": "string" },
+            "budget": { "type": "string" },
+            "interests": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "trips": { "type": "array", "items": { "$ref": "Trip" } },
+        "savedSpots": { "type": "array", "items": { "$ref": "Spot" } },
+        "savedReels": { "type": "array", "items": { "type": "string" } },
+        "importHistory": { "type": "array", "items": { "type": "object" } },
+        "searchHistory": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["uid", "name"]
+    },
+    "Spot": {
+      "title": "Travel Spot",
+      "description": "A specific location or point of interest",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "imageUrl": { "type": "string" }
+      }
+    },
+    "Trip": {
+      "title": "Travel Trip",
+      "description": "A planned itinerary for a destination",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "destination": { "type": "string" },
+        "duration": { "type": "number" },
+        "dates": { "type": "string" },
+        "spots": { "type": "array", "items": { "$ref": "Spot" } },
+        "hotels": { "type": "array", "items": { "type": "object" } },
+        "itinerary": { "type": "array", "items": { "type": "object" } },
+        "budget": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and their private travel data"
+    }
+  }
+}

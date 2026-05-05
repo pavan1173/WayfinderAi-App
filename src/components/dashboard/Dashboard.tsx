@@ -12,6 +12,7 @@ import { geminiService } from '../../services/geminiService';
 import ReactMarkdown from 'react-markdown';
 import { Spot, Trip } from '../../services/geminiService';
 import { ImportHistoryModal } from '../import/ImportHistoryModal';
+import { ProfileView } from '../profile/ProfileView';
 
 export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, onPlanTrip: (destination?: string, spots?: Spot[], duration?: number) => void }) => {
   const { trips, savedSpots, user, setCurrentTrip, deleteTrip, addTrip, addSearch, searchHistory } = useApp();
@@ -25,14 +26,10 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   const [selectedSavedSpot, setSelectedSavedSpot] = useState<Spot | null>(null);
   const [savedSpotDetails, setSavedSpotDetails] = useState<{ shortDescription: string, keywords: string[], newThings: string, upcomingEvents: string } | null>(null);
   const [isGettingSpotDetails, setIsGettingSpotDetails] = useState(false);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isReelsOpen, setIsReelsOpen] = useState(false);
-  const [editName, setEditName] = useState(user?.name || 'DURGA VENKATA PRASAD CHITIKINA');
-  const [editBio, setEditBio] = useState(user?.bio || '');
   const [tripToDelete, setTripToDelete] = useState<string | null>(null);
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{destination: string, dates: string, duration: number} | null>(null);
-  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [showAllTrips, setShowAllTrips] = useState(false);
   const [showAllGuides, setShowAllGuides] = useState(false);
   const [showAllSocial, setShowAllSocial] = useState(false);
@@ -45,6 +42,8 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   const [tripSort, setTripSort] = useState<'name' | 'date'>('date');
   const [spotFilter, setSpotFilter] = useState('');
   const [spotSort, setSpotSort] = useState<'name' | 'category'>('name');
+  const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
+  const [isDeleteAccountConfirmOpen, setIsDeleteAccountConfirmOpen] = useState(false);
 
   const handleSearch = () => {
     if (!searchQuery.trim()) return;
@@ -136,54 +135,6 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
     }
     setPullY(0);
     startY.current = 0;
-  };
-
-  const handleSaveProfile = () => {
-    if (!editName.trim()) {
-      showToast("Name cannot be empty");
-      return;
-    }
-    if (editName.length > 50) {
-      showToast("Name is too long");
-      return;
-    }
-    if (editBio.length > 200) {
-      showToast("Bio is too long");
-      return;
-    }
-    setUser({ ...user, name: editName, bio: editBio, avatar: user?.avatar || '' });
-    setIsEditingProfile(false);
-    showToast("Profile updated successfully");
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth);
-      showToast("Signed out successfully");
-    } catch (error) {
-      console.error("Error signing out", error);
-      showToast("Error signing out");
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    try {
-      const user = auth.currentUser;
-      if (user) {
-        await deleteDoc(doc(db, 'users', user.uid));
-        await deleteUser(user);
-        showToast("Account deleted successfully");
-        setShowDeleteAccountConfirm(false);
-      }
-    } catch (error: any) {
-      console.error("Error deleting account", error);
-      if (error.code === 'auth/user-token-expired') {
-        showToast("For security, please sign out and sign back in before deleting your account.");
-      } else {
-        showToast("Error deleting account");
-      }
-      setShowDeleteAccountConfirm(false);
-    }
   };
 
   const handleExportTrip = (trip: Trip) => {
@@ -776,128 +727,8 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.2 }}
-              className="mt-8 md:mt-0 space-y-6 max-w-2xl mx-auto pb-24"
             >
-              <div className="flex items-center gap-4 relative group">
-                <div className="w-20 h-20 bg-purple-500 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-sm flex-shrink-0">
-                  {user?.name?.[0] || 'D'}
-                </div>
-                <div className="flex-1">
-                  {isEditingProfile ? (
-                    <div className="space-y-2">
-                      <input 
-                        type="text" 
-                        value={editName} 
-                        onChange={(e) => setEditName(e.target.value)} 
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 uppercase focus:outline-none focus:ring-2 focus:ring-brand"
-                        placeholder="Your Name"
-                      />
-                      <textarea 
-                        value={editBio} 
-                        onChange={(e) => setEditBio(e.target.value)} 
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand resize-none"
-                        placeholder="Add a short bio"
-                        rows={2}
-                      />
-                      <div className="flex gap-2">
-                        <button onClick={handleSaveProfile} className="bg-brand text-white px-4 py-1.5 rounded-lg text-xs font-bold">Save</button>
-                        <button onClick={() => setIsEditingProfile(false)} className="bg-slate-100 text-slate-600 px-4 py-1.5 rounded-lg text-xs font-bold">Cancel</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h2 className="text-xl font-bold text-slate-800 uppercase leading-tight">
-                          {user?.name || 'DURGA VENKATA PRASAD CHITIKINA'}
-                        </h2>
-                        {user?.bio ? (
-                          <p className="text-sm text-slate-600 mt-1">{user.bio}</p>
-                        ) : (
-                          <button onClick={() => setIsEditingProfile(true)} className="text-xs text-slate-400 mt-1 hover:text-slate-600 transition-colors">
-                            Add a short bio
-                          </button>
-                        )}
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setEditName(user?.name || 'DURGA VENKATA PRASAD CHITIKINA');
-                          setEditBio(user?.bio || '');
-                          setIsEditingProfile(true);
-                        }} 
-                        className="text-xs font-bold text-brand hover:text-brand-dark transition-colors"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 text-center shadow-sm">
-                  <div className="text-2xl font-bold text-slate-800">{savedSpots.length}</div>
-                  <div className="text-xs text-slate-500 mt-1">Saved</div>
-                </div>
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 text-center shadow-sm">
-                  <div className="text-2xl font-bold text-slate-800">{trips.length}</div>
-                  <div className="text-xs text-slate-500 mt-1">Trips</div>
-                </div>
-              </div>
-
-              {/* Import History */}
-              <motion.button whileTap={{ scale: 0.98 }} onClick={() => setIsImportHistoryOpen(true)} className="w-full bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-100">
-                    <img src="https://loremflickr.com/100/100/history,travel" className="w-full h-full object-cover" alt="History" />
-                  </div>
-                  <span className="font-bold text-slate-700">Import History</span>
-                </div>
-                <ChevronRight size={20} className="text-slate-400" />
-              </motion.button>
-              
-              <ImportHistoryModal isOpen={isImportHistoryOpen} onClose={() => setIsImportHistoryOpen(false)} />
-            
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                <motion.button whileTap={{ scale: 0.98 }} onClick={() => window.location.href = 'mailto:support@wayfinder.ai'} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                  <Mail size={20} className="text-slate-400" />
-                  <span className="font-medium text-slate-700">Email Us</span>
-                </motion.button>
-                <motion.button whileTap={{ scale: 0.98 }} onClick={() => showToast("Joining community")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                  <MessageCircle size={20} className="text-slate-400" />
-                  <span className="font-medium text-slate-700">Join Community</span>
-                </motion.button>
-                <motion.button whileTap={{ scale: 0.98 }} onClick={() => showToast("Leaving a review")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                  <StarIcon size={20} className="text-slate-400" />
-                  <span className="font-medium text-slate-700">Leave a Review</span>
-                </motion.button>
-                <motion.button whileTap={{ scale: 0.98 }} onClick={() => showToast("Sharing Wayfinder")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                  <Share size={20} className="text-slate-400" />
-                  <span className="font-medium text-slate-700">Share Wayfinder</span>
-                </motion.button>
-              </div>
-
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                <button onClick={() => showToast("Preferences opened")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                  <Bookmark size={20} className="text-slate-400" />
-                  <span className="font-medium text-slate-700">Preferences</span>
-                </button>
-                <button onClick={() => showToast("Viewing Privacy Policy")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                  <Shield size={20} className="text-slate-400" />
-                  <span className="font-medium text-slate-700">Privacy Policy</span>
-                </button>
-                <button onClick={() => showToast("Viewing Terms of Use")} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                  <FileIcon size={20} className="text-slate-400" />
-                  <span className="font-medium text-slate-700">Terms of Use</span>
-                </button>
-                <button onClick={handleSignOut} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                  <LogOut size={20} className="text-slate-400" />
-                  <span className="font-medium text-slate-700">Sign Out</span>
-                </button>
-                <button onClick={() => setShowDeleteAccountConfirm(true)} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors text-red-500">
-                  <Trash2 size={20} />
-                  <span className="font-medium">Delete Account</span>
-                </button>
-              </div>
+              <ProfileView />
             </motion.div>
           )}
           </AnimatePresence>
@@ -913,27 +744,6 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
             <Plus size={28} strokeWidth={3} />
           </button>
         </div>
-
-        {/* Confirmation Modal */}
-        <AnimatePresence>
-          {showDeleteAccountConfirm && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full"
-              >
-                <h3 className="text-xl font-bold text-slate-800 mb-2">Delete Account</h3>
-                <p className="text-slate-600 mb-6">Are you sure you want to delete your account? This action cannot be undone.</p>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowDeleteAccountConfirm(false)} className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-bold">Cancel</button>
-                  <button onClick={handleDeleteAccount} className="flex-1 bg-red-500 text-white py-3 rounded-xl font-bold">Delete</button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
 
         {/* Bottom Nav (Mobile) */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex items-center justify-around z-20 pb-safe">

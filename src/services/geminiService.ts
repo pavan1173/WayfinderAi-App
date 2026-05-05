@@ -46,6 +46,25 @@ function sanitizeInput(input: string): string {
   return input.replace(/<[^>]*>?/gm, '').substring(0, 5000).trim();
 }
 
+function parseJsonResponse(rawText: string): any {
+  try {
+    // Try to remove markdown code blocks
+    const cleanedText = rawText.replace(/```json\n?|\n?```/g, '').trim();
+    return JSON.parse(cleanedText);
+  } catch (e) {
+    // If that fails, try to extract JSON from conversational text
+    const jsonMatch = rawText.match(/(\[.*\]|\{.*\})/s);
+    if (jsonMatch) {
+        try {
+            return JSON.parse(jsonMatch[0]);
+        } catch (e2) {
+            console.error("Failed to parse extracted JSON", e2);
+        }
+    }
+    throw new Error("Failed to parse JSON response");
+  }
+}
+
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
   try {
     return await fn();
@@ -160,28 +179,14 @@ export const geminiService = {
     try {
       const response = await withRetry(() => ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `Extract travel spots from: "${text}". Provide: name, description, category, lat, lng.`,
+        contents: `Extract travel spots from: "${text}". Provide a JSON array of objects with fields: name, description, category, lat, lng.
+        Return the response EXCLUSIVELY as a JSON object, with absolutely no markdown formatting, no code blocks, and no conversational text.`,
         config: {
           tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                category: { type: Type.STRING },
-                lat: { type: Type.NUMBER },
-                lng: { type: Type.NUMBER },
-              },
-              required: ["name", "description", "category", "lat", "lng"],
-            },
-          },
         },
       }));
 
-      const spots = JSON.parse(response.text);
+      const spots = parseJsonResponse(response.text);
       const uniqueSpots = spots.filter((s: any, index: number, self: any[]) => 
         index === self.findIndex((t) => t.name === s.name)
       );
@@ -217,26 +222,15 @@ export const geminiService = {
 
       const infoText = response.text;
 
-      const structuredResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `Extract from text: website, phone, hours, lat, lng. Text: ${infoText}`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              website: { type: Type.STRING },
-              phone: { type: Type.STRING },
-              openingHours: { type: Type.STRING },
-              lat: { type: Type.NUMBER },
-              lng: { type: Type.NUMBER },
-            }
-          }
-        }
-      });
-
       let parsed: any = {};
       try {
+        const structuredResponse = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: `Extract from text: website, phone, hours, lat, lng. Text: ${infoText}`,
+          config: {
+          },
+        });
+
         parsed = JSON.parse(structuredResponse.text);
       } catch (e) {
         console.error("Failed to parse structured response", e);
@@ -269,36 +263,14 @@ export const geminiService = {
                 data: base64Image
               }
             },
-            { text: "Analyze this image. First, determine if it is an AI-generated image or a real photo. Then, if it is a real photo (not AI-generated), extract all the travel spots mentioned or visible. For each spot, provide name, description, category, and approximate latitude/longitude coordinates. If it is an AI-generated image, return an empty array for spots." }
+            { text: "Analyze this image. First, determine if it is an AI-generated image or a real photo. Then, if it is a real photo (not AI-generated), extract all the travel spots mentioned or visible. For each spot, provide name, description, category, and approximate latitude/longitude coordinates. If it is an AI-generated image, return an empty array for spots. Provide the output EXCLUSIVELY as a JSON object with the keys: 'isAiGenerated' (boolean) and 'spots' (array of objects with: name, description, category, lat, lng)." }
           ]
         },
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              isAiGenerated: { type: Type.BOOLEAN },
-              spots: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    category: { type: Type.STRING },
-                    lat: { type: Type.NUMBER },
-                    lng: { type: Type.NUMBER },
-                  },
-                  required: ["name", "description", "category", "lat", "lng"],
-                },
-              }
-            },
-            required: ["isAiGenerated", "spots"]
-          },
         },
       });
 
-      const result = JSON.parse(response.text);
+      const result = parseJsonResponse(response.text);
       const spotsWithImages = await Promise.all(result.spots.map(async (s: any) => ({
         ...s,
         id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36).substr(-4),
@@ -371,24 +343,10 @@ export const geminiService = {
         - category: The type of place (e.g., Restaurant, Landmark, Nature).
         - lat: Approximate latitude (if unknown, use 0).
         - lng: Approximate longitude (if unknown, use 0).
-        Return a JSON array of objects. If a field is unknown, use reasonable defaults.`,
+        Return a JSON array of objects. If a field is unknown, use reasonable defaults.
+        Return the response EXCLUSIVELY as a JSON object, with absolutely no markdown formatting, no code blocks, and no conversational text.`,
         config: {
           tools: [{ urlContext: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                category: { type: Type.STRING },
-                lat: { type: Type.NUMBER },
-                lng: { type: Type.NUMBER },
-              },
-              required: ["name", "description", "category", "lat", "lng"],
-            },
-          },
         },
       });
 
@@ -430,26 +388,11 @@ export const geminiService = {
           ]
         },
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                category: { type: Type.STRING },
-                lat: { type: Type.NUMBER },
-                lng: { type: Type.NUMBER },
-              },
-              required: ["name", "description", "category", "lat", "lng"],
-            },
-          },
         },
       });
 
-      const spots = JSON.parse(response.text);
-      const uniqueSpots = spots.filter((s: any, index: number, self: any[]) => 
+      const data = parseJsonResponse(response.text);
+      const uniqueSpots = data.filter((s: any, index: number, self: any[]) => 
         index === self.findIndex((t) => t.name === s.name)
       );
       return Promise.all(uniqueSpots.map(async (s: any) => ({
@@ -499,20 +442,10 @@ export const geminiService = {
         model: "gemini-3-flash-preview",
         contents: `Extract opening hours, reviews, and unique insights from the following text. Text: ${infoText}`,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              openingHours: { type: Type.STRING },
-              reviews: { type: Type.ARRAY, items: { type: Type.STRING } },
-              insights: { type: Type.STRING },
-            },
-            required: ["openingHours", "reviews", "insights"]
-          }
-        }
+        },
       });
 
-      return JSON.parse(structuredResponse.text);
+      return parseJsonResponse(structuredResponse.text);
     } catch (e) {
       return handleGeminiError(e, { openingHours: "Not available", reviews: [], insights: "No insights available." }, "getting spot rich details");
     }
@@ -555,59 +488,10 @@ export const geminiService = {
         Also provide an estimated budget (e.g., "$1500" or "Moderate") and recommend 3 nearby hotels with their name, rating, pricePerNight, description, and an image search keyword.
         Return a JSON object representing the trip.`,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              destination: { type: Type.STRING },
-              duration: { type: Type.NUMBER },
-              budget: { type: Type.STRING },
-              hotels: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    rating: { type: Type.NUMBER },
-                    pricePerNight: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    imageKeyword: { type: Type.STRING }
-                  },
-                  required: ["name", "rating", "pricePerNight", "description", "imageKeyword"]
-                }
-              },
-              itinerary: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    day: { type: Type.NUMBER },
-                    spots: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: {
-                          id: { type: Type.STRING },
-                          name: { type: Type.STRING },
-                          description: { type: Type.STRING },
-                          category: { type: Type.STRING },
-                          lat: { type: Type.NUMBER },
-                          lng: { type: Type.NUMBER },
-                        },
-                        required: ["id", "name", "description", "category", "lat", "lng"]
-                      }
-                    }
-                  },
-                  required: ["day", "spots"]
-                }
-              }
-            },
-            required: ["destination", "duration", "budget", "hotels", "itinerary"]
-          }
         }
       });
 
-      const data = JSON.parse(response.text);
+      const data = parseJsonResponse(response.text);
       // Re-attach the original image URLs and full spot data
       const fullItinerary = await Promise.all(data.itinerary.map(async (day: any) => ({
         day: day.day,
@@ -653,48 +537,15 @@ export const geminiService = {
         model: "gemini-3-flash-preview",
         contents: `Plan a ${days}-day itinerary for ${destination} using ALL of these spots (provided as ID: Name): ${spots.map(s => `${s.id}: ${s.name}`).join(", ")}. You MUST include every single spot provided in the itinerary. Group them logically by day to minimize travel time.
         CRITICAL: Verify the location name and ensure it is a real, specific, and accurate place. If you are unsure about a place, do not include it.
-        Also provide an estimated budget (e.g., "$1500" or "Moderate") and recommend 3 nearby hotels with their name, rating, pricePerNight, description, and an image search keyword. Return the spot IDs for each day.`,
+        Also provide an estimated budget (e.g., "$1500" or "Moderate") and recommend 3 nearby hotels with their name, rating, pricePerNight, description, and an image search keyword. 
+        
+        Return the response EXCLUSIVELY as a JSON object, with absolutely no markdown formatting, no code blocks, and no conversational text.
+        Structure: { "budget": "...", "hotels": [...], "itinerary": [{ "day": 1, "spotIds": ["..."] }, ...] }`,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              budget: { type: Type.STRING },
-              hotels: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    rating: { type: Type.NUMBER },
-                    pricePerNight: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    imageKeyword: { type: Type.STRING }
-                  },
-                  required: ["name", "rating", "pricePerNight", "description", "imageKeyword"]
-                }
-              },
-              itinerary: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    day: { type: Type.INTEGER },
-                    spotIds: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING }
-                    },
-                  },
-                  required: ["day", "spotIds"],
-                },
-              }
-            },
-            required: ["budget", "hotels", "itinerary"]
-          },
         },
       });
 
-      const data = JSON.parse(response.text);
+      const data = parseJsonResponse(response.text);
       const itinerary = data.itinerary.map((p: any) => ({
         day: p.day,
         spots: p.spotIds.map((id: string) => spots.find(s => s.id === id)).filter(Boolean),
@@ -734,25 +585,10 @@ export const geminiService = {
         model: "gemini-3-flash-preview",
         contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Text: ${infoText}`,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                category: { type: Type.STRING },
-                lat: { type: Type.NUMBER },
-                lng: { type: Type.NUMBER },
-              },
-              required: ["name", "description", "category", "lat", "lng"],
-            },
-          },
         },
       }));
 
-      const spots = JSON.parse(structuredResponse.text);
+      const spots = parseJsonResponse(structuredResponse.text);
       return Promise.all(spots.map(async (s: any) => ({
         ...s,
         id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36).substr(-4),
@@ -794,25 +630,10 @@ export const geminiService = {
         model: "gemini-2.5-flash",
         contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Ensure the lat/lng are accurate to the location provided. Text: ${infoText}`,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                category: { type: Type.STRING },
-                lat: { type: Type.NUMBER },
-                lng: { type: Type.NUMBER },
-              },
-              required: ["name", "description", "category", "lat", "lng"],
-            },
-          },
         },
       }));
 
-      const spots = JSON.parse(structuredResponse.text);
+      const spots = parseJsonResponse(structuredResponse.text);
       const uniqueSpots = spots.filter((s: any, index: number, self: any[]) => 
         index === self.findIndex((t) => t.name === s.name)
       );
@@ -836,26 +657,9 @@ export const geminiService = {
         model: "gemini-3-flash-preview",
         contents: `Reorder the following travel spots to create the most efficient travel route. Return the spots in the new order as a JSON array. Spots: ${JSON.stringify(spots)}`,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                id: { type: Type.STRING },
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                category: { type: Type.STRING },
-                lat: { type: Type.NUMBER },
-                lng: { type: Type.NUMBER },
-                imageUrl: { type: Type.STRING },
-              },
-              required: ["id", "name", "description", "category", "lat", "lng"],
-            },
-          },
         },
       }));
-      return JSON.parse(response.text);
+      return parseJsonResponse(response.text);
     } catch (e) {
       console.error("Failed to optimize route", e);
       return spots; // Return original order if optimization fails
@@ -885,26 +689,10 @@ export const geminiService = {
         model: "gemini-3-flash-preview",
         contents: `Extract the travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, reason, lat, and lng. Text: ${infoText}`,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                category: { type: Type.STRING },
-                reason: { type: Type.STRING },
-                lat: { type: Type.NUMBER },
-                lng: { type: Type.NUMBER },
-              },
-              required: ["name", "description", "category", "reason", "lat", "lng"],
-            },
-          },
         },
       });
 
-      const suggestions = JSON.parse(structuredResponse.text);
+      const suggestions = parseJsonResponse(structuredResponse.text);
       const uniqueSuggestions = suggestions.filter((s: any, index: number, self: any[]) => 
         index === self.findIndex((t) => t.name === s.name)
       );
@@ -942,24 +730,10 @@ export const geminiService = {
         For each place, provide a brief description, category, and why it's worth visiting.
         Return a JSON array of objects with: name, description, category, imageUrl (use a placeholder if unknown).`,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                category: { type: Type.STRING },
-                imageUrl: { type: Type.STRING },
-              },
-              required: ["name", "description", "category", "imageUrl"],
-            },
-          },
         },
       });
 
-      const spots = JSON.parse(structuredResponse.text);
+      const spots = parseJsonResponse(structuredResponse.text);
       const result = await Promise.all(spots.map(async (s: any, i: number) => ({
         ...s,
         id: i + 1,
@@ -1007,23 +781,10 @@ export const geminiService = {
         3. "insights": A brief, 2-3 sentence AI-generated insight about the spot.
         Ensure the response is valid JSON.`,
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              openingHours: { type: Type.STRING },
-              reviews: { 
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-              },
-              insights: { type: Type.STRING }
-            },
-            required: ["openingHours", "reviews", "insights"]
-          }
         }
       });
       
-      return JSON.parse(response.text);
+      return parseJsonResponse(response.text);
     } catch (e) {
       return handleGeminiError(e, {
         openingHours: "Information not available.",

@@ -16,6 +16,7 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  app.set('trust proxy', 1);
   app.use("/api/", limiter); // Apply to all API routes
 
   // API routes FIRST
