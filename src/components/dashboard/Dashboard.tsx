@@ -357,75 +357,82 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                 transition={{ duration: 0.2 }}
                 className="max-w-6xl mx-auto"
               >
-            {/* Header */}
-            <header className="flex justify-between items-center mb-6">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center text-white font-bold">W</div>
-                <span className="text-xl font-bold text-slate-900">Wayfinder AI</span>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-sm">
-                {user?.name?.[0] || 'A'}
-              </div>
-            </header>
-
-            {/* Hero Section */}
-            <motion.section variants={itemVariants} className="relative rounded-3xl overflow-hidden mb-8 shadow-xl">
-              <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1200" className="absolute inset-0 w-full h-full object-cover" alt="Hero" />
-              <div className="absolute inset-0 bg-black/30" />
-              <div className="relative p-8 flex flex-col gap-4 text-white">
-                <div className="flex items-center gap-2 text-white/80 text-sm">
-                  <Sparkles size={16} />
-                  Let's explore
+            {/* Search Bar */}
+            <motion.section variants={itemVariants} className="mt-4 card p-6">
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Search size={20} />
                 </div>
-                <div>
-                  <h2 className="text-4xl font-bold">Discover places, <br />create <i className="italic">memories</i></h2>
-                  <p className="text-white/80 mt-2">AI curated trips just for you</p>
-                </div>
+                <input
+                  type="text"
+                  placeholder="Where to next?"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius-button)] py-4 pl-12 pr-24 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all"
+                />
                 <button
-                  onClick={onAddClick}
-                  className="bg-white text-brand rounded-2xl py-3 px-6 font-bold self-start hover:bg-slate-100 transition-colors flex items-center gap-2"
+                  onClick={handleSearch}
+                  className="absolute right-2 top-2 bottom-2 bg-brand text-white px-6 rounded-[var(--radius-button)] font-bold text-sm hover:bg-brand-dark transition-colors"
                 >
-                  <Sparkles size={18} />
-                  Plan Your Trip
+                  Search
                 </button>
               </div>
             </motion.section>
 
-            {/* Popular Trips Section */}
-            <motion.section variants={itemVariants} className="mb-8">
-              <div className="flex justify-between mb-4">
-                <h3 className="text-xl font-bold text-slate-900">Popular Trips</h3>
-                <button className="text-brand text-sm font-semibold">View all</button>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
-                {[
-                  { title: "3-Day Taj Mahal & Agra", label: "Most Loved", image: "https://images.unsplash.com/photo-1564507592333-c60657eea523?q=80&w=400" },
-                  { title: "4-Day Jaipur Royal Trip", label: "Best Seller", image: "https://images.unsplash.com/photo-1599661046289-e31887206151?q=80&w=400" }
-                ].map((trip, i) => (
-                  <div key={i} className="flex-shrink-0 w-64 aspect-[4/3] rounded-3xl overflow-hidden relative shadow-lg">
-                    <img src={trip.image} className="w-full h-full object-cover" alt={trip.title} />
-                    <div className="absolute top-4 left-4 bg-white/20 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-full">{trip.label}</div>
-                    <div className="absolute bottom-4 left-4 text-white font-bold">{trip.title}</div>
+            {/* Chat with Wayfinder Ai */}
+            <motion.section variants={itemVariants} className="mt-4">
+              <button 
+                onClick={() => setIsChatOpen(true)}
+                className="w-full bg-slate-900 text-white p-6 rounded-3xl flex items-center justify-between shadow-xl shadow-slate-200"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
+                    <Sparkles className="text-brand" />
                   </div>
-                ))}
-              </div>
+                  <div className="text-left">
+                    <div className="font-bold">Chat with Wayfinder Ai</div>
+                    <div className="text-xs text-white/60">AI-powered travel advice</div>
+                  </div>
+                </div>
+                <ChevronRight size={20} className="text-white/40" />
+              </button>
             </motion.section>
 
-            {/* Action Buttons Section */}
-            <motion.section variants={itemVariants} className="mb-8 grid grid-cols-4 gap-4">
-              {[
-                { icon: MapPin, label: "Nearby" },
-                { icon: Compass, label: "Destinations" },
-                { icon: Sparkles, label: "Itinerary" },
-                { icon: Heart, label: "Favorites" }
-              ].map((item, i) => (
-                <div key={i} className="flex flex-col items-center gap-2">
-                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-brand shadow-sm">
-                    <item.icon size={28} />
-                  </div>
-                  <span className="text-xs text-slate-600 font-medium">{item.label}</span>
-                </div>
-              ))}
+            {/* Travel Guides */}
+            <motion.section variants={itemVariants} className="mt-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-800">Top 10 Places in India</h2>
+                <button onClick={() => setShowAllGuides(!showAllGuides)} className="text-brand text-sm font-semibold">
+                  {showAllGuides ? "View less" : "View all"}
+                </button>
+              </div>
+              <div className={cn("gap-4 pb-4", showAllGuides ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "flex overflow-x-auto custom-scrollbar -mx-6 px-6")}>
+                {guides.map(guide => (
+                  <motion.div 
+                    key={guide.id}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      showToast(`Planning ${guide.title}`);
+                      const durationMatch = guide.title.match(/(\d+)-Day/);
+                      const duration = durationMatch ? parseInt(durationMatch[1]) : 3;
+                      handlePlanTrip(guide.destination, undefined, duration);
+                    }}
+                    className={cn("relative rounded-2xl overflow-hidden shadow-md cursor-pointer", showAllGuides ? "w-full aspect-[3/4]" : "flex-shrink-0 w-40 h-56")}
+                  >
+                    <img 
+                      src={guide.image} 
+                      className="w-full h-full object-cover" 
+                      referrerPolicy="no-referrer" 
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(guide.title)}/400/400`; }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent p-4 flex flex-col justify-end">
+                      <div className="text-white font-bold text-sm leading-tight">{guide.title}</div>
+                      <div className="text-white/70 text-[10px] mt-1">{guide.spots} Spots</div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
             </motion.section>
 
             {/* Nearby Places */}

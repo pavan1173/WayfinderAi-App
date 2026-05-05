@@ -47,21 +47,46 @@ function sanitizeInput(input: string): string {
 }
 
 function parseJsonResponse(rawText: string): any {
+  if (!rawText) throw new Error("Empty response");
+
+  // Try parsing directly
   try {
-    // Try to remove markdown code blocks
-    const cleanedText = rawText.replace(/```json\n?|\n?```/g, '').trim();
+    return JSON.parse(rawText.trim());
+  } catch (e) {}
+
+  // Try to remove markdown code blocks
+  const cleanedText = rawText.replace(/```json\n?|\n?```/g, '').trim();
+  try {
     return JSON.parse(cleanedText);
-  } catch (e) {
-    // If that fails, try to extract JSON from conversational text
-    const jsonMatch = rawText.match(/(\[.*\]|\{.*\})/s);
-    if (jsonMatch) {
-        try {
-            return JSON.parse(jsonMatch[0]);
-        } catch (e2) {
-            console.error("Failed to parse extracted JSON", e2);
-        }
-    }
-    throw new Error("Failed to parse JSON response");
+  } catch (e) {}
+
+  // If that fails, try to extract JSON from conversational text
+  // Look for the first '{' or '[' and the last '}' or ']'
+  const startObj = cleanedText.indexOf('{');
+  const startArr = cleanedText.indexOf('[');
+  
+  let startIndex = -1;
+  if (startObj !== -1 && (startArr === -1 || startObj < startArr)) {
+    startIndex = startObj;
+  } else if (startArr !== -1) {
+    startIndex = startArr;
+  }
+
+  if (startIndex === -1) throw new Error("No JSON structure found");
+
+  const endObj = cleanedText.lastIndexOf('}');
+  const endArr = cleanedText.lastIndexOf(']');
+  
+  let endIndex = Math.max(endObj, endArr);
+  
+  if (endIndex === -1 || endIndex <= startIndex) throw new Error("Invalid JSON structure");
+
+  const potentialJson = cleanedText.substring(startIndex, endIndex + 1);
+  
+  try {
+      return JSON.parse(potentialJson);
+  } catch (e2) {
+      throw new Error("Failed to parse JSON response: " + e2);
   }
 }
 
@@ -231,7 +256,7 @@ export const geminiService = {
           },
         });
 
-        parsed = JSON.parse(structuredResponse.text);
+        parsed = parseJsonResponse(structuredResponse.text);
       } catch (e) {
         console.error("Failed to parse structured response", e);
       }
@@ -350,7 +375,7 @@ export const geminiService = {
         },
       });
 
-      const spots = JSON.parse(response.text);
+      const spots = parseJsonResponse(response.text);
       const uniqueSpots = spots.filter((s: any, index: number, self: any[]) => 
         index === self.findIndex((t) => t.name === s.name)
       );

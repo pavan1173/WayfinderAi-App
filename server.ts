@@ -4,11 +4,6 @@ import path from "path";
 import dotenv from "dotenv";
 import rateLimit from "express-rate-limit";
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-
 dotenv.config();
 
 async function startServer() {
@@ -16,7 +11,12 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
-  app.set('trust proxy', 1);
+  app.set('trust proxy', true);
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    keyGenerator: (req) => (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown'
+  });
   app.use("/api/", limiter); // Apply to all API routes
 
   // API routes FIRST
