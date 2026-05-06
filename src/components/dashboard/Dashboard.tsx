@@ -286,47 +286,94 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       {/* Sidebar (Desktop) */}
-      <div className="hidden md:flex flex-col w-64 bg-white border-r border-slate-100 h-full p-6 z-20">
-        <h1 className="text-3xl font-display font-bold text-brand mb-12">Wayfinder Ai</h1>
-        <div className="flex-1 space-y-4">
-          <button onClick={() => setActiveTab('home')} className={cn("flex items-center gap-3 w-full p-3 rounded-xl transition-colors", activeTab === 'home' ? "bg-brand/10 text-brand font-bold" : "text-slate-500 hover:bg-slate-50 font-medium")}>
+      <div className="hidden md:flex flex-col w-72 bg-white border-r border-stone-100 h-full p-8 z-20">
+        <div className="flex items-center gap-3 mb-12">
+          <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand/20">
             <Compass size={24} />
+          </div>
+          <h1 className="text-2xl font-display font-bold text-brand tracking-tighter">Wayfinder</h1>
+        </div>
+        
+        <div className="flex-1 space-y-2">
+          <button 
+            onClick={() => setActiveTab('home')} 
+            className={cn(
+              "flex items-center gap-3 w-full p-4 rounded-2xl transition-all duration-200 group", 
+              activeTab === 'home' 
+                ? "bg-slate-50 text-brand font-bold" 
+                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium"
+            )}
+          >
+            <Compass size={20} className={cn("transition-colors", activeTab === 'home' ? "text-brand" : "text-slate-400 group-hover:text-slate-600")} />
             Explore
           </button>
-          <button onClick={() => setActiveTab('saved')} className={cn("flex items-center gap-3 w-full p-3 rounded-xl transition-colors", activeTab === 'saved' ? "bg-brand/10 text-brand font-bold" : "text-slate-500 hover:bg-slate-50 font-medium")}>
-            <Heart size={24} />
+          <button 
+            onClick={() => setActiveTab('saved')} 
+            className={cn(
+              "flex items-center gap-3 w-full p-4 rounded-2xl transition-all duration-200 group", 
+              activeTab === 'saved' 
+                ? "bg-slate-50 text-brand font-bold" 
+                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium"
+            )}
+          >
+            <Heart size={20} className={cn("transition-colors", activeTab === 'saved' ? "text-brand" : "text-slate-400 group-hover:text-slate-600")} />
             Saved
           </button>
-          <button onClick={() => setActiveTab('profile')} className={cn("flex items-center gap-3 w-full p-3 rounded-xl transition-colors", activeTab === 'profile' ? "bg-brand/10 text-brand font-bold" : "text-slate-500 hover:bg-slate-50 font-medium")}>
-            <User size={24} />
+          <button 
+            onClick={() => setActiveTab('profile')} 
+            className={cn(
+              "flex items-center gap-3 w-full p-4 rounded-2xl transition-all duration-200 group", 
+              activeTab === 'profile' 
+                ? "bg-slate-50 text-brand font-bold" 
+                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium"
+            )}
+          >
+            <User size={20} className={cn("transition-colors", activeTab === 'profile' ? "text-brand" : "text-slate-400 group-hover:text-slate-600")} />
             Profile
           </button>
         </div>
-        <button onClick={onAddClick} className="w-full bg-brand text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-brand/20 hover:scale-105 active:scale-95 transition-transform">
+
+        <button 
+          onClick={onAddClick} 
+          className="w-full bg-brand text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-[var(--shadow-brand)] hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all"
+        >
           <Plus size={20} />
-          Plan Trip
+          Create Trip
         </button>
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
         {/* Header (Mobile) */}
-        <div className="md:hidden px-6 py-3 bg-white flex items-center justify-between z-10 h-[60px]">
-          <h1 className="text-3xl font-display font-bold text-brand">Wayfinder Ai</h1>
-          <div className="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center text-brand font-bold border-2 border-white shadow-sm">
+        <div className="md:hidden px-6 py-4 bg-white border-b border-slate-100 flex items-center justify-between z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center text-white">
+              <Compass size={18} />
+            </div>
+            <h1 className="text-xl font-display font-bold text-brand tracking-tight">Wayfinder</h1>
+          </div>
+          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-brand font-bold border border-slate-200">
             {user?.name?.[0] || 'D'}
           </div>
         </div>
 
-        {/* Header (Desktop) */}
-        <div className="hidden md:flex px-8 pt-4 pb-4 items-center justify-end z-10">
-          <div className="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center text-brand font-bold border-2 border-white shadow-sm">
-            {user?.name?.[0] || 'D'}
+        {/* Top Header (Desktop) */}
+        <div className="hidden md:flex px-8 py-6 items-center justify-between z-10 sticky top-0 bg-[#FAFBFC]/80 backdrop-blur-md">
+          <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest px-4 py-1.5 bg-slate-100 rounded-full">
+            Journey Planner
+          </h2>
+          <div className="flex items-center gap-4">
+            <button className="p-2.5 text-slate-400 hover:text-brand hover:bg-white hover:shadow-sm rounded-xl transition-all">
+              <Bookmark size={20} />
+            </button>
+            <div className="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-white font-bold shadow-lg shadow-brand/10 border-2 border-white">
+              {user?.name?.[0] || 'D'}
+            </div>
           </div>
         </div>
 
         <div 
-          className="flex-1 overflow-y-auto no-scrollbar px-6 md:px-8 pb-32 md:pb-8 relative"
+          className="flex-1 overflow-y-auto no-scrollbar px-6 md:px-12 pb-32 md:pb-12 relative"
           ref={scrollRef}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -338,8 +385,8 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
             style={{ height: `${pullY}px`, opacity: pullY / 80 }}
           >
             <div className={cn(
-              "w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-brand transition-transform",
-              isRefreshing ? "animate-spin" : "rotate-0"
+              "w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center text-brand transition-transform",
+              isRefreshing ? "animate-spin" : "rotate-0 shadow-brand/10"
             )}>
               <Sparkles size={16} />
             </div>
@@ -355,153 +402,159 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                 animate="visible"
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.2 }}
-                className="max-w-6xl mx-auto"
+                className="max-w-5xl mx-auto"
               >
+            {/* Hero Section */}
+            <motion.section variants={itemVariants} className="mt-4 mb-12">
+              <h3 className="text-4xl md:text-5xl font-display font-bold text-slate-900 mb-4 leading-[1.1]">
+                Where will your <br/> next story <span className="text-brand">unfold?</span>
+              </h3>
+              <p className="text-slate-500 text-lg max-w-md leading-relaxed">
+                Plan unique itineraries and discover hidden gems powered by the world's most advanced travel AI.
+              </p>
+            </motion.section>
+
             {/* Search Bar */}
-            <motion.section variants={itemVariants} className="mt-4 card p-6">
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                  <Search size={20} />
+            <motion.section variants={itemVariants} className="mt-8">
+              <div className="relative group">
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand transition-colors">
+                  <Search size={22} />
                 </div>
                 <input
                   type="text"
-                  placeholder="Where to next?"
+                  placeholder="Try '7 days in Bali' or 'Weekend in Kyoto'..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-[var(--radius-button)] py-4 pl-12 pr-24 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all"
+                  className="w-full bg-white border border-slate-100 shadow-[var(--shadow-lg)] rounded-3xl py-6 pl-16 pr-32 text-lg font-medium focus:outline-none focus:ring-4 focus:ring-brand/5 transition-all outline-none placeholder:text-slate-300"
                 />
                 <button
                   onClick={handleSearch}
-                  className="absolute right-2 top-2 bottom-2 bg-brand text-white px-6 rounded-[var(--radius-button)] font-bold text-sm hover:bg-brand-dark transition-colors"
+                  className="absolute right-3 top-3 bottom-3 bg-brand text-white px-8 rounded-2xl font-bold text-base hover:bg-brand-dark transition-all shadow-lg shadow-brand/20 active:scale-95"
                 >
-                  Search
+                  Explore
                 </button>
               </div>
             </motion.section>
 
-            {/* Chat with Wayfinder Ai */}
-            <motion.section variants={itemVariants} className="mt-4">
+            {/* AI Travel Concierge */}
+            <motion.section variants={itemVariants} className="mb-12 mt-4">
               <button 
                 onClick={() => setIsChatOpen(true)}
-                className="w-full bg-slate-900 text-white p-6 rounded-3xl flex items-center justify-between shadow-xl shadow-slate-200"
+                className="w-full bg-slate-900 text-white p-6 rounded-[var(--radius-card)] flex items-center justify-between shadow-xl shadow-slate-200 group overflow-hidden relative"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand/20 blur-3xl -mr-16 -mt-16 group-hover:bg-brand/30 transition-colors" />
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10">
                     <Sparkles className="text-brand" />
                   </div>
                   <div className="text-left">
-                    <div className="font-bold">Chat with Wayfinder Ai</div>
-                    <div className="text-xs text-white/60">AI-powered travel advice</div>
+                    <div className="font-bold text-lg">AI Travel Concierge</div>
+                    <div className="text-xs text-white/50">Ask anything about your destination</div>
                   </div>
                 </div>
-                <ChevronRight size={20} className="text-white/40" />
+                <ChevronRight size={20} className="text-white/40 group-hover:text-white transition-colors" />
               </button>
             </motion.section>
 
             {/* Travel Guides */}
-            <motion.section variants={itemVariants} className="mt-8">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-800">Top 10 Places in India</h2>
-                <button onClick={() => setShowAllGuides(!showAllGuides)} className="text-brand text-sm font-semibold">
-                  {showAllGuides ? "View less" : "View all"}
+            <motion.section variants={itemVariants} className="mb-12">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-display font-bold text-slate-900">Featured Collections</h2>
+                <button onClick={() => setShowAllGuides(!showAllGuides)} className="text-brand text-sm font-bold hover:underline">
+                  {showAllGuides ? "Show less" : "View all"}
                 </button>
               </div>
-              <div className={cn("gap-4 pb-4", showAllGuides ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "flex overflow-x-auto custom-scrollbar -mx-6 px-6")}>
+              <div className={cn("gap-6 pb-6", showAllGuides ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "flex overflow-x-auto no-scrollbar -mx-6 px-6")}>
                 {guides.map(guide => (
                   <motion.div 
                     key={guide.id}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ y: -8 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => {
-                      showToast(`Planning ${guide.title}`);
                       const durationMatch = guide.title.match(/(\d+)-Day/);
                       const duration = durationMatch ? parseInt(durationMatch[1]) : 3;
                       handlePlanTrip(guide.destination, undefined, duration);
                     }}
-                    className={cn("relative rounded-2xl overflow-hidden shadow-md cursor-pointer", showAllGuides ? "w-full aspect-[3/4]" : "flex-shrink-0 w-40 h-56")}
+                    className={cn("group relative bg-white rounded-[var(--radius-card)] overflow-hidden shadow-[var(--shadow-md)] transition-all cursor-pointer border border-slate-100", showAllGuides ? "w-full" : "flex-shrink-0 w-64")}
                   >
-                    <img 
-                      src={guide.image} 
-                      className="w-full h-full object-cover" 
-                      referrerPolicy="no-referrer" 
-                      onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(guide.title)}/400/400`; }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent p-4 flex flex-col justify-end">
-                      <div className="text-white font-bold text-sm leading-tight">{guide.title}</div>
-                      <div className="text-white/70 text-[10px] mt-1">{guide.spots} Spots</div>
+                    <div className="aspect-[4/5] overflow-hidden relative">
+                      <img 
+                        src={guide.image} 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                        referrerPolicy="no-referrer" 
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(guide.title)}/600/800`; }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-6 flex flex-col justify-end">
+                        <h4 className="text-lg font-display font-bold text-white mb-1 group-hover:text-brand transition-colors">{guide.title}</h4>
+                        <div className="flex items-center gap-2 text-white/70 text-xs font-medium">
+                          <MapPin size={12} /> {guide.destination}
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
               </div>
             </motion.section>
 
-            {/* Nearby Places */}
-            <motion.section variants={itemVariants} className="mt-8">
-              <div className="flex items-center justify-between mb-4">
+            {/* Explore Nearby */}
+            <motion.section variants={itemVariants} className="mb-12">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-display font-bold text-slate-900">Explore Nearby</h2>
                 <motion.button 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  whileHover={{ scale: 1.05, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={handleNearbyClick}
-                  className="bg-gradient-to-r from-brand to-brand-dark text-white px-6 py-3 rounded-2xl shadow-lg font-bold flex items-center gap-2 transition-all"
+                  className="bg-brand text-white px-5 py-2.5 rounded-full shadow-lg shadow-brand/10 font-bold text-sm flex items-center gap-2 transition-all"
                 >
-                  Nearby Places
+                  <MapPin size={16} /> 
+                  Places Near Me
                   {isLoadingNearby && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                 </motion.button>
-                {showNearby && nearbySpots.length > 0 && (
-                  <button onClick={() => showToast("These are the places that are nearby to you.")} className="p-1 hover:bg-slate-100 rounded-full transition-colors">
-                    <Info size={16} className="text-brand" />
-                  </button>
-                )}
               </div>
-              {showNearby && (
-                <div className="flex overflow-x-auto custom-scrollbar -mx-6 px-6 gap-4 pb-4">
-                  {nearbySpots.map((spot, index) => (
-                    <motion.div 
-                      key={spot.id}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleSavedSpotClick(spot)}
-                      className="relative rounded-3xl overflow-hidden shadow-md group cursor-pointer flex-shrink-0 w-48 h-72"
-                    >
-                      <img 
-                        src={spot.imageUrl} 
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                        referrerPolicy="no-referrer" 
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(spot.name)}/400/400`; }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-4 flex flex-col justify-end">
-                        <div className="text-white font-bold text-sm line-clamp-2 leading-tight">{spot.name}</div>
-                        <div className="text-white/70 text-[10px] mt-1">{spot.category}</div>
-                      </div>
-                    </motion.div>
-                  ))}
-                  {isLoadingNearby && nearbySpots.length === 0 && (
-                    [1, 2, 3].map(i => (
-                      <div key={i} className="flex-shrink-0 w-48 h-72 bg-slate-200 rounded-3xl overflow-hidden shadow-md animate-pulse">
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
+              
+              <AnimatePresence>
+                {showNearby && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="flex overflow-x-auto no-scrollbar -mx-6 px-6 gap-6 pb-6 pt-2"
+                  >
+                    {nearbySpots.map((spot, index) => (
+                      <motion.div 
+                        key={spot.id}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        onClick={() => handleSavedSpotClick(spot)}
+                        className="flex-shrink-0 w-48 bg-white rounded-3xl overflow-hidden shadow-[var(--shadow-md)] border border-slate-50 cursor-pointer group"
+                      >
+                        <div className="h-32 overflow-hidden relative">
+                          <img 
+                            src={spot.imageUrl} 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                            referrerPolicy="no-referrer" 
+                          />
+                        </div>
+                        <div className="p-4">
+                          <h5 className="font-bold text-slate-800 text-sm line-clamp-1 mb-1">{spot.name}</h5>
+                          <span className="text-[10px] font-bold text-brand uppercase tracking-wider">{spot.category}</span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.section>
 
-              {/* My Trips */}
-              <motion.section 
-                variants={itemVariants}
-                className="mt-8"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-slate-800">My Trips</h2>
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="Filter by destination" value={tripFilter} onChange={(e) => setTripFilter(e.target.value)} className="border rounded-lg px-2 py-1 text-xs" />
-                    <select value={tripSort} onChange={(e) => setTripSort(e.target.value as 'name' | 'date')} className="border rounded-lg px-2 py-1 text-xs">
-                      <option value="date">Sort by Date</option>
-                      <option value="name">Sort by Name</option>
+              {/* My Collections */}
+              <motion.section variants={itemVariants} className="mb-24">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-display font-bold text-slate-900">Your Journeys</h2>
+                  <div className="flex items-center gap-3">
+                    <select value={tripSort} onChange={(e) => setTripSort(e.target.value as 'name' | 'date')} className="bg-white border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold text-slate-500 outline-none hover:bg-slate-50 transition-colors shadow-sm">
+                      <option value="date">Latest First</option>
+                      <option value="name">Name A-Z</option>
                     </select>
                   </div>
                   {trips.length > 3 && (
@@ -515,67 +568,45 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
                 </div>
                 
                 {filteredTrips.length > 0 ? (
-                  <div className="flex flex-col gap-4">
-                    {(showAllTrips ? filteredTrips : filteredTrips.slice(0, 3)).map(trip => (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {(showAllTrips ? filteredTrips : filteredTrips.slice(0, 4)).map(trip => (
                       <motion.div 
                         key={trip.id}
-                        whileHover={{ scale: 1.01, backgroundColor: "#f8fafc" }}
-                        whileTap={{ scale: 0.99 }}
-                        className="bg-white p-4 rounded-[var(--radius-card)] flex items-center gap-4 cursor-pointer border border-slate-200 shadow-sm transition-all"
+                        whileHover={{ y: -4 }}
+                        className="bg-white p-5 rounded-[var(--radius-card)] border border-slate-100 shadow-[var(--shadow-md)] transition-all cursor-pointer group"
                         onClick={() => setCurrentTrip(trip)}
                       >
-                        <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0">
-                          <img 
-                            src={trip.spots?.[0]?.imageUrl || `https://loremflickr.com/600/400/${encodeURIComponent(trip.destination.split(' ').join(','))}`} 
-                            className="w-full h-full object-cover" 
-                            referrerPolicy="no-referrer" 
-                            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${encodeURIComponent(trip.destination)}/600/400`; }}
-                          />
-                        </div>
+                        <div className="flex gap-5">
+                          <div className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 relative">
+                            <img 
+                              src={trip.spots?.[0]?.imageUrl || `https://loremflickr.com/400/400/${encodeURIComponent(trip.destination)}`} 
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                              referrerPolicy="no-referrer" 
+                            />
+                            <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                          </div>
                         
-                        <div className="flex-1 flex items-center justify-between">
-                          {editingTripId === trip.id ? (
-                            <div className="flex flex-col gap-2 w-full">
-                              <input type="text" value={editValues?.destination} onChange={(e) => setEditValues(prev => prev ? {...prev, destination: e.target.value} : null)} className="border rounded p-1 text-sm" />
-                              <input type="text" value={editValues?.dates} onChange={(e) => setEditValues(prev => prev ? {...prev, dates: e.target.value} : null)} className="border rounded p-1 text-sm" />
-                              <input type="number" value={editValues?.duration} onChange={(e) => setEditValues(prev => prev ? {...prev, duration: parseInt(e.target.value)} : null)} className="border rounded p-1 text-sm" />
-                              <div className="flex gap-2">
-                                <button onClick={() => handleSaveEdit(trip)} className="bg-brand text-white px-2 py-1 rounded text-xs">Save</button>
-                                <button onClick={handleCancelEdit} className="bg-slate-200 px-2 py-1 rounded text-xs">Cancel</button>
+                          <div className="flex-1 min-w-0 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <h4 className="font-display font-bold text-slate-900 text-lg group-hover:text-brand transition-colors truncate">
+                                  {trip.destination}
+                                </h4>
+                                <span className="flex-shrink-0 text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-full uppercase tracking-tighter">
+                                  {trip.duration}d
+                                </span>
                               </div>
+                              <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed italic">
+                                Features {trip.spots.length} unique spots in {trip.destination}
+                              </p>
                             </div>
-                          ) : (
-                            <>
-                              <div className="flex flex-col justify-center">
-                                <div className="font-bold text-slate-900 text-sm leading-tight">{trip.duration}-Day {trip.destination}<br/>Trip</div>
-                                <div className="text-xs text-slate-500 mt-0.5">{trip.spots.length} Spots</div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="p-2 text-slate-400 hover:text-brand transition-colors"><Pencil size={18} /></button>
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleExportTrip(trip);
-                                  }}
-                                  className="p-2 text-slate-400 hover:text-brand transition-colors"
-                                >
-                                  <Download size={18} />
-                                </button>
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setTripToDelete(trip.id);
-                                  }}
-                                  className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
-                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center">
-                                  <ChevronRight size={18} className="text-slate-400" />
-                                </div>
-                              </div>
-                            </>
-                          )}
+                            
+                            <div className="flex items-center justify-end gap-1 mt-4">
+                              <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="p-2 text-slate-400 hover:text-brand transition-colors"><Pencil size={16} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); handleExportTrip(trip); }} className="p-2 text-slate-400 hover:text-brand transition-colors"><Download size={16} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); setTripToDelete(trip.id); }} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                            </div>
+                          </div>
                         </div>
                       </motion.div>
                   ))}
@@ -596,31 +627,30 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
 
             {/* Search History */}
             <motion.section 
-              className="mt-8"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: 0.5 }}
+              className="mt-8 mb-24"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
             >
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-800">Search History</h2>
+                <h2 className="text-lg font-display font-bold text-slate-900">Recent Explorations</h2>
               </div>
               {searchHistory.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   {searchHistory.map((destination, index) => (
                     <motion.button 
                       key={index}
-                      whileHover={{ scale: 1.02, boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)" }}
+                      whileHover={{ y: -2, backgroundColor: "var(--brand-light)", color: "var(--brand)" }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handlePlanTrip(destination)}
-                      className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                      className="bg-white border border-slate-100 text-slate-600 px-5 py-2 rounded-2xl text-xs font-bold transition-all shadow-sm"
                     >
                       {destination}
                     </motion.button>
                   ))}
                 </div>
               ) : (
-                <div className="text-slate-400 text-sm italic">No recent searches.</div>
+                <div className="text-slate-400 text-xs font-medium italic">No recent searches.</div>
               )}
             </motion.section>
             </motion.div>
@@ -629,8 +659,9 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
           {activeTab === 'saved' && (
             <motion.div 
               key="saved"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.2 }}
               className="mt-8 md:mt-0 max-w-6xl mx-auto pb-24"
@@ -723,8 +754,9 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
           {activeTab === 'profile' && (
             <motion.div 
               key="profile"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.2 }}
             >
