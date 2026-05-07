@@ -204,7 +204,9 @@ export const geminiService = {
     try {
       const response = await withRetry(() => ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `Extract travel spots from: "${text}". Provide a JSON array of objects with fields: name, description, category, lat, lng.
+        contents: `Extract travel spots from: "${text}". 
+        If an extracted spot is a famous landmark, statue, or entity that exists in multiple locations or has multiple branches, provide a list of all major confirmed locations for this entity, making sure each has its own name, description, category, lat, and lng.
+        Provide a JSON array of objects with fields: name, description, category, lat, lng.
         Return the response EXCLUSIVELY as a JSON object, with absolutely no markdown formatting, no code blocks, and no conversational text.`,
         config: {
           tools: [{ googleSearch: {} }],
@@ -288,7 +290,7 @@ export const geminiService = {
                 data: base64Image
               }
             },
-            { text: "Analyze this image. First, determine if it is an AI-generated image or a real photo. Then, if it is a real photo (not AI-generated), extract all the travel spots mentioned or visible. For each spot, provide name, description, category, and approximate latitude/longitude coordinates. If it is an AI-generated image, return an empty array for spots. Provide the output EXCLUSIVELY as a JSON object with the keys: 'isAiGenerated' (boolean) and 'spots' (array of objects with: name, description, category, lat, lng)." }
+            { text: "Analyze this image. First, determine if it is an AI-generated image or a real photo. Then, if it is a real photo (not AI-generated), extract all the travel spots mentioned or visible. If the object identified is a famous landmark, statue, or entity that exists in multiple locations or has multiple branches (e.g., Isha Foundation), provide a list of all major confirmed locations for this entity, each with distinct names, descriptions, and coordinates. If it is an AI-generated image, return an empty array for spots. Provide the output EXCLUSIVELY as a JSON object with the keys: 'isAiGenerated' (boolean) and 'spots' (array of objects with: name, description, category, lat, lng)." }
           ]
         },
         config: {

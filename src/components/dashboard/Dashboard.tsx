@@ -806,9 +806,14 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
           >
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
               <h2 className="text-xl font-bold text-slate-800">Chat with Wayfinder Ai</h2>
-              <button onClick={() => setIsChatOpen(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setChatResponse(''); setChatQuery(''); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 hover:text-red-500 transition-colors" title="Clear history">
+                  <Trash2 size={20} />
+                </button>
+                <button onClick={() => setIsChatOpen(false)} className="p-2 hover:bg-slate-100 rounded-full">
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -839,13 +844,24 @@ export const Dashboard = ({ onAddClick, onPlanTrip }: { onAddClick: () => void, 
             </div>
 
             <div className="p-6 border-t border-slate-100">
+              <div className="mb-4 flex flex-wrap gap-2">
+                {['Best time to visit', 'Local customs', 'Must-try food', 'Hidden gems'].map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => setChatQuery(prompt)}
+                    className="bg-slate-100 hover:bg-brand/10 text-slate-600 hover:text-brand px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
               <div className="flex gap-2">
                 <input 
                   value={chatQuery}
                   onChange={(e) => setChatQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleChat()}
                   placeholder="Ask for advice..."
-                  className="flex-1 bg-slate-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-brand/20"
+                  className="flex-1 bg-slate-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-brand/20 outline-none"
                 />
                 <button 
                   onClick={handleChat}
