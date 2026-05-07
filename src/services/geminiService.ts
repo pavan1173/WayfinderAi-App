@@ -520,15 +520,15 @@ export const geminiService = {
 
       const data = parseJsonResponse(response.text);
       // Re-attach the original image URLs and full spot data
-      const fullItinerary = await Promise.all(data.itinerary.map(async (day: any) => ({
+      const fullItinerary = await Promise.all((data.itinerary || []).map(async (day: any) => ({
         day: day.day,
-        spots: await Promise.all(day.spots.map(async (s: any) => {
+        spots: await Promise.all((day.spots || []).map(async (s: any) => {
           const originalSpot = spots.find(os => os.id === s.id);
           return originalSpot ? { ...originalSpot, description: s.description } : { ...s, imageUrl: await getWikipediaImage(s.name) };
         }))
       })));
       
-      const hotels = await Promise.all(data.hotels.map(async (h: any) => ({
+      const hotels = await Promise.all((data.hotels || []).map(async (h: any) => ({
         name: h.name,
         rating: h.rating,
         pricePerNight: h.pricePerNight,
@@ -577,7 +577,7 @@ export const geminiService = {
         day: p.day,
         spots: p.spotIds.map((id: string) => spots.find(s => s.id === id)).filter(Boolean),
       }));
-      const hotels = await Promise.all(data.hotels.map(async (h: any) => ({
+      const hotels = await Promise.all((data.hotels || []).map(async (h: any) => ({
         name: h.name,
         rating: h.rating,
         pricePerNight: h.pricePerNight,
@@ -655,7 +655,8 @@ export const geminiService = {
       // Step 2: Use a fast model to structure the text into JSON
       const structuredResponse = await withRetry(() => ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Ensure the lat/lng are accurate to the location provided. Text: ${infoText}`,
+        contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Ensure the lat/lng are accurate to the location provided. 
+        Return the response EXCLUSIVELY as a JSON format, with absolutely no markdown formatting, no code blocks, and no conversational text. JSON output should be a valid JSON array. Text: ${infoText}`,
         config: {
         },
       }));
