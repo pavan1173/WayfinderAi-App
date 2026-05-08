@@ -209,6 +209,7 @@ export const geminiService = {
         Provide a JSON array of objects with fields: name, description, category, lat, lng.
         Return the response EXCLUSIVELY as a JSON object, with absolutely no markdown formatting, no code blocks, and no conversational text.`,
         config: {
+          responseMimeType: "application/json",
           tools: [{ googleSearch: {} }],
         },
       }));
@@ -294,6 +295,7 @@ export const geminiService = {
           ]
         },
         config: {
+          responseMimeType: "application/json",
         },
       });
 
@@ -465,12 +467,13 @@ export const geminiService = {
 
       const infoText = response.text;
 
-      const structuredResponse = await ai.models.generateContent({
+      const structuredResponse = await withRetry(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Extract opening hours, reviews, and unique insights from the following text. Text: ${infoText}`,
+        contents: `Extract opening hours, reviews, and unique insights from the following text and return as a JSON object with keys: openingHours, reviews (array), insights. Text: ${infoText}`,
         config: {
+          responseMimeType: "application/json",
         },
-      });
+      }));
 
       return parseJsonResponse(structuredResponse.text);
     } catch (e) {
@@ -506,17 +509,18 @@ export const geminiService = {
   async planTripFromSavedSpots(spots: Spot[], duration: number, preferences: string[]): Promise<Trip> {
     try {
       const spotsJson = JSON.stringify(spots.map(s => ({ id: s.id, name: s.name, category: s.category, lat: s.lat, lng: s.lng })));
-      const response = await ai.models.generateContent({
+      const response = await withRetry(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Create a ${duration}-day trip itinerary using ALL of the following saved spots: ${spotsJson}. You MUST include every single spot provided in the itinerary.
         The user preferences are: ${preferences.join(', ')}.
         Suggest the best order for visiting these locations based on proximity and user preferences.
         CRITICAL: Verify the location name and ensure it is a real, specific, and accurate place. If you are unsure about a place, do not include it.
         Also provide an estimated budget (e.g., "$1500" or "Moderate") and recommend 3 nearby hotels with their name, rating, pricePerNight, description, and an image search keyword.
-        Return a JSON object representing the trip.`,
+        Return a JSON object representing the trip with keys: destination (string), duration (number), budget (string), hotels (array), itinerary (array of {day, spotIds}).`,
         config: {
+          responseMimeType: "application/json"
         }
-      });
+      }));
 
       const data = parseJsonResponse(response.text);
       // Re-attach the original image URLs and full spot data
@@ -560,7 +564,7 @@ export const geminiService = {
 
   async planItinerary(destination: string, days: number, spots: Spot[]): Promise<{ itinerary: Trip['itinerary'], budget: string, hotels: Hotel[] }> {
     try {
-      const response = await ai.models.generateContent({
+      const response = await withRetry(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Plan a ${days}-day itinerary for ${destination} using ALL of these spots (provided as ID: Name): ${spots.map(s => `${s.id}: ${s.name}`).join(", ")}. You MUST include every single spot provided in the itinerary. Group them logically by day to minimize travel time.
         CRITICAL: Verify the location name and ensure it is a real, specific, and accurate place. If you are unsure about a place, do not include it.
@@ -569,8 +573,9 @@ export const geminiService = {
         Return the response EXCLUSIVELY as a JSON object, with absolutely no markdown formatting, no code blocks, and no conversational text.
         Structure: { "budget": "...", "hotels": [...], "itinerary": [{ "day": 1, "spotIds": ["..."] }, ...] }`,
         config: {
+          responseMimeType: "application/json",
         },
-      });
+      }));
 
       const data = parseJsonResponse(response.text);
       const itinerary = data.itinerary.map((p: any) => ({
@@ -655,9 +660,9 @@ export const geminiService = {
       // Step 2: Use a fast model to structure the text into JSON
       const structuredResponse = await withRetry(() => ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Ensure the lat/lng are accurate to the location provided. 
-        Return the response EXCLUSIVELY as a JSON format, with absolutely no markdown formatting, no code blocks, and no conversational text. JSON output should be a valid JSON array. Text: ${infoText}`,
+        contents: `Extract travel spots from the following text and return them as a JSON array. For each spot, include: name, description, category, lat, and lng. Ensure the lat/lng are accurate to the location provided. Text: ${infoText}`,
         config: {
+          responseMimeType: "application/json",
         },
       }));
 

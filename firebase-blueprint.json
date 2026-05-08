@@ -55,7 +55,9 @@
         "spots": { "type": "array", "items": { "$ref": "Spot" } },
         "hotels": { "type": "array", "items": { "type": "object" } },
         "itinerary": { "type": "array", "items": { "type": "object" } },
-        "budget": { "type": "string" }
+        "budget": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "members": { "type": "array", "items": { "type": "string" } }
       }
     }
   },
@@ -63,6 +65,10 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles and their private travel data"
+    },
+    "/trips/{tripId}": {
+      "schema": "Trip",
+      "description": "Shared travel itineraries"
     }
   }
 }
